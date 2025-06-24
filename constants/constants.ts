@@ -11,3 +11,4 @@ export const FEE_LEVEL = Number(retrieveEnvVariable('FEE_LEVEL'))
 export const PROFIT_LEVEL = Number(retrieveEnvVariable('PROFIT_LEVEL'))
 export const JITO_KEY = retrieveEnvVariable('JITO_KEY')
 export const JITO_MODE = retrieveEnvVariable('JITO_KEY') === 'true'
+export const COMMITMENT = retrieveEnvVariable('COMMITMENT') == "processed" ? "processed" : "confirmed"
