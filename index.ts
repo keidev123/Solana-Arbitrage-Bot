@@ -1,9 +1,8 @@
-import { Keypair, Connection, Commitment, LAMPORTS_PER_SOL, VersionedTransaction, TransactionMessage, ComputeBudgetProgram, SystemProgram } from "@solana/web3.js"
+import { Keypair, Connection} from "@solana/web3.js"
 import base58 from "bs58"
 
 import { PRIVATE_KEY, RPC_ENDPOINT, RPC_WEBSOCKET_ENDPOINT } from "./constants"
-import { getVolume } from "./src/photon"
-import { DEX } from "./src/dex/pumpswap"
+import { Pumpswap } from "./src/dex/pumpswap"
 import { PumpSwapProgram } from "./contract/pumpswap"
 
 export const connection = new Connection(RPC_ENDPOINT, {
@@ -11,21 +10,24 @@ export const connection = new Connection(RPC_ENDPOINT, {
 })
 export const mainKp = Keypair.fromSecretKey(base58.decode(PRIVATE_KEY))
 
-
-
 const main = async () => {
-  const pumpswapDex = new DEX(connection, PumpSwapProgram)
+  const pumpswapDex = new Pumpswap(connection, PumpSwapProgram, 200, 5)
   pumpswapDex.fetchTransactions()
 
-  setInterval(() => {
-    console.log(pumpswapDex.getAllTrades())
-    console.log(pumpswapDex.getAllTrades().size, "pairs")
-  }, 5000)
-  
+  setTimeout(async () => {
+    const trendingPair = await pumpswapDex.filterTrendingPairs()
+    console.log("trending pair number fetched by trading volume ranking ", pumpswapDex.getTrendingPairs().size)
+    const miagratedPairs = await pumpswapDex.filterMigratedToken()
+    console.log("pumpfun miagrated token pairs:", miagratedPairs.size)
+    const targetPairs = await pumpswapDex.filterByHistoryForTargetToken();
+    console.log("target pairs number fetched by history", targetPairs.size)
+    
+    console.log("TARGET PAIRS:", targetPairs)
+  }, 10000)
+
 
 
 }
-
 
 
 
