@@ -2,7 +2,8 @@
   "name": "volume-bot",
   "scripts": {
     "tsc": "tsc --noEmit",
-    "start": "ts-node index.ts"
+    "start": "ts-node index.ts",
+    "gather": "ts-node ./src/gather.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.30.1",

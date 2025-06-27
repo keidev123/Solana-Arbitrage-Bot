@@ -1,8 +1,8 @@
 import { BN, Program } from "@coral-xyz/anchor";
-import { PumpSwap } from "../../contract/pumpswap/pumpswap";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { NATIVE_MINT } from "@solana/spl-token";
 import { analyzeToken } from "../photon";
+import { PumpSwap } from "../../contract/pumpswap/pumpswap";
 import { PumpfunProgram } from "../../contract/pumpfun";
 
 type PumpswapTradesSum = {

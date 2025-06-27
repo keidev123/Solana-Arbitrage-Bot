@@ -8,11 +8,12 @@ import {
 } from '@solana/web3.js';
 import { FEE_LEVEL, SLIPPAGE } from '../constants';
 
-export const getBuyTxWithJupiter = async (wallet: Keypair, baseMint: PublicKey, amount: number) => {
+export const getBuyTxWithJupiter = async (wallet: Keypair, baseMint: PublicKey, amount: number, dex: string | undefined = undefined) => {
   try {
     const quoteResponse = await (
       await fetch(
         `https://quote-api.jup.ag/v6/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=${baseMint.toBase58()}&amount=${amount}&slippageBps=${SLIPPAGE}`
+        // `https://quote-api.jup.ag/v6/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=${baseMint.toBase58()}&amount=${amount}&slippageBps=${SLIPPAGE}${dex ? `&dexes=${dex}` : ``}`
       )
     ).json();
 
@@ -46,11 +47,12 @@ export const getBuyTxWithJupiter = async (wallet: Keypair, baseMint: PublicKey, 
   }
 };
 
-export const getSellTxWithJupiter = async (wallet: Keypair, baseMint: PublicKey, amount: string) => {
+export const getSellTxWithJupiter = async (wallet: Keypair, baseMint: PublicKey, amount: string, dex: string | undefined = undefined) => {
   try {
     const quoteResponse = await (
       await fetch(
         `https://quote-api.jup.ag/v6/quote?inputMint=${baseMint.toBase58()}&outputMint=So11111111111111111111111111111111111111112&amount=${amount}&slippageBps=${SLIPPAGE}`
+        // `https://quote-api.jup.ag/v6/quote?inputMint=${baseMint.toBase58()}&outputMint=So11111111111111111111111111111111111111112&amount=${amount}&slippageBps=${SLIPPAGE}${dex ? `&dexes=${dex}` : ``}`
       )
     ).json();
 
