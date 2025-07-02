@@ -1,4 +1,4 @@
-import { Keypair, Connection} from "@solana/web3.js"
+import { Keypair, Connection } from "@solana/web3.js"
 import base58 from "bs58"
 
 import { PRIVATE_KEY, RPC_ENDPOINT, RPC_WEBSOCKET_ENDPOINT } from "./constants"
@@ -13,31 +13,31 @@ export const connection = new Connection(RPC_ENDPOINT, {
 })
 export const mainKp = Keypair.fromSecretKey(base58.decode(PRIVATE_KEY))
 
-const main = async () => {
-  // const pumpswapDex = new Pumpswap(connection, PumpSwapProgram, 200, 5)
-  // pumpswapDex.fetchTransactions()
+const getTargetPair = async () => {
+  const pumpswapDex = new Pumpswap(connection, PumpSwapProgram, 200, 15)
+  pumpswapDex.fetchTransactions()
+  pumpswapDex.printTransactionNum()
 
-  // setTimeout(async () => {
-  //   const trendingPair = await pumpswapDex.filterTrendingPairs()
-  //   console.log("trending pair number fetched by trading volume ranking ", pumpswapDex.getTrendingPairs().size)
-  //   const miagratedPairs = await pumpswapDex.filterMigratedToken()
-  //   console.log("pumpfun miagrated token pairs:", miagratedPairs.size)
-  //   const targetPairs = await pumpswapDex.filterByHistoryForTargetToken();
-  //   console.log("target pairs number fetched by history", targetPairs.size)
-    
-  //   console.log("TARGET PAIRS:", targetPairs)
-  // }, 60_000)
+  setInterval(async () => {
+    const trendingPair = await pumpswapDex.filterTrendingPairs()
+    console.log("trending pair number fetched by trading volume ranking ", pumpswapDex.getTrendingPairs().size)
+    const miagratedPairs = await pumpswapDex.filterMigratedToken()
+    console.log("pumpfun miagrated token pairs:", miagratedPairs.size)
+    const targetPairs = await pumpswapDex.filterByHistoryForTargetToken();
+    console.log("target pairs number fetched by history", targetPairs.size)
 
-  const tokenMint = new PublicKey("4C1ETR4XK1Ys3JFhMz6At66kRrWLVvUFUSLLQmMwpump")
-  const pool = new PublicKey("9jn88tz8q54dSgZdGnGBXTjYbPYBxAuUvhJPs5e37jSG")
-  const pair = new TradingPair(connection, mainKp, pool, tokenMint, 0.1)
+    console.log("TARGET PAIRS:", targetPairs)
+  }, 10_000)
+}
+const runTrade = async () => {
+  const tokenMint = new PublicKey("GqJK2CW5PJfTGkNs54dNxfd8MifHTc4M62L39oQ9Ca9z")
+  const pool = new PublicKey("HzMg8mxYk92HCnY6KH9PhhqpJJBhBbTULWCFHyRwzdAb")
+  const pair = new TradingPair(connection, mainKp, pool, tokenMint, 0.07)
   pair.runTrades(5)
 
   // const walletData = readJson()
   // const wallet = Keypair.fromSecretKey(base58.decode(walletData[0].privateKey))
   // await sellPumpswapTokenBySDK(connection, wallet, tokenMint, pool, 0.01, 0)
-
-
 }
 
 
@@ -45,4 +45,5 @@ const main = async () => {
 
 
 
-main()
+getTargetPair()
+// runTrade()

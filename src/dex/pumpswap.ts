@@ -11,6 +11,9 @@ type PumpswapTradesSum = {
   quoteAmountIn: BN,
   baseAmountOut: BN,
   quoteAmountOut: BN,
+  buyAmount: number,
+  sellAmount: number,
+  tradingVolume: number,
   tradeNum: number,
   startTime: BN,
 };
@@ -23,6 +26,7 @@ type TrendingPair = {
 }
 
 
+
 export class Pumpswap {
   private connection: Connection;
   private allTrades: Set<PumpswapTradesSum>;
@@ -32,6 +36,7 @@ export class Pumpswap {
   private program: Program<PumpSwap>;
   private limitByTradeNum: number;
   private targetPairNum: number
+  private transactionNum: number = 0
 
 
   constructor(connection: Connection, program: Program<PumpSwap>, limitByTradeNum: number = 100, targetPairNum: number = 10) {
@@ -50,31 +55,40 @@ export class Pumpswap {
 
     // buy listener
     const buyListenerId = this.program.addEventListener('buyEvent', async (event, slot, signature) => {
-      const { pool, baseAmountOut, quoteAmountIn, timestamp } = event
-
+      const { pool, baseAmountOut, quoteAmountInWithLpFee, timestamp } = event
+      if(baseAmountOut.toNumber() < quoteAmountInWithLpFee.toNumber()) {
+        return
+      }
       const existing = Array.from(this.allTrades).find(
         (trade) => trade.pool.equals(pool)
       );
+
       if (existing) {
         this.allTrades.delete(existing);
         this.allTrades.add({
           ...existing,
           baseAmountOut: existing.baseAmountOut.add(baseAmountOut),
-          quoteAmountIn: existing.quoteAmountIn.add(quoteAmountIn),
-          tradeNum: existing.tradeNum + 1
+          quoteAmountIn: existing.quoteAmountIn.add(quoteAmountInWithLpFee),
+          buyAmount: existing.buyAmount + quoteAmountInWithLpFee.toNumber(),
+          tradingVolume: existing.tradingVolume + quoteAmountInWithLpFee.toNumber(),
+          tradeNum: existing.tradeNum + 1,
         });
       } else {
         // Add new trade
         this.allTrades.add({
           pool,
           baseAmountIn: new BN(0),
-          quoteAmountIn,
+          quoteAmountIn: quoteAmountInWithLpFee,
           baseAmountOut,
           quoteAmountOut: new BN(0),
+          buyAmount: quoteAmountInWithLpFee.toNumber(),
+          sellAmount: 0,
+          tradingVolume: quoteAmountInWithLpFee.toNumber(),
           tradeNum: 0,
           startTime: timestamp,
         });
       }
+      this.transactionNum++
       // this.program.removeEventListener(buyListenerId);
     })
 
@@ -84,13 +98,18 @@ export class Pumpswap {
       const existing = Array.from(this.allTrades).find(
         (trade) => trade.pool.equals(pool)
       );
+      if(baseAmountIn.toNumber() < quoteAmountOut.toNumber()) {
+        return
+      }
       if (existing) {
         this.allTrades.delete(existing);
         this.allTrades.add({
           ...existing,
           baseAmountIn: existing.baseAmountIn.add(baseAmountIn),
           quoteAmountOut: existing.quoteAmountOut.add(quoteAmountOut),
-          tradeNum: existing.tradeNum + 1
+          sellAmount: existing.sellAmount + quoteAmountOut.toNumber(),
+          tradingVolume: existing.tradingVolume + quoteAmountOut.toNumber(),
+          tradeNum: existing.tradeNum + 1,
         });
       } else {
         // Add new trade
@@ -101,9 +120,13 @@ export class Pumpswap {
           baseAmountOut: new BN(0),
           quoteAmountOut,
           tradeNum: 0,
+          buyAmount: 0,
+          sellAmount: quoteAmountOut.toNumber(),
+          tradingVolume: quoteAmountOut.toNumber(),
           startTime: timestamp,
         });
       }
+      this.transactionNum++
       // this.program.removeEventListener(sellListenerId);
     })
   }
@@ -111,7 +134,7 @@ export class Pumpswap {
   async filterTrendingPairs(): Promise<Set<TrendingPair>> {
     // Analyze all trades to find trending pairs
     const sortedTrades = Array.from(this.allTrades)
-      .sort((a, b) => b.tradeNum - a.tradeNum) // descending by trade count
+      .sort((a, b) => b.tradingVolume - a.tradingVolume) // descending by trade count
       .slice(0, this.limitByTradeNum); // take top N
 
     const poolAccounts = await this.program.account.pool.fetchMultiple(
@@ -134,19 +157,15 @@ export class Pumpswap {
 
       const tokenMint = isBaseSOL ? pool.quoteMint : pool.baseMint;
 
-      const buyVolume = isBaseSOL ? trade.baseAmountOut : trade.quoteAmountOut;
-      const sellVolume = isBaseSOL ? trade.baseAmountIn : trade.quoteAmountIn;
-
-      if (buyVolume < sellVolume.div(new BN(3)).mul(new BN(2)))
+      if (trade.buyAmount < trade.sellAmount)
         continue;    // skip if buy volume is less than 2/3 of sell volume
 
       this.trendingPairs.add({
         pool: trade.pool,
         tokenMint,
-        buyVolume: buyVolume.toNumber() / 10 ** 9,
-        sellVolume: sellVolume.toNumber() / 10 ** 9,
+        buyVolume: trade.buyAmount / 10 ** 9,
+        sellVolume: trade.sellAmount / 10 ** 9,
       });
-
     }
     return this.trendingPairs;
   }
@@ -200,7 +219,6 @@ export class Pumpswap {
   }
 
 
-
   /** Fetch price history for trending pairs */
   async fetchPriceHistory(pair: TrendingPair): Promise<number[]> {
     // TODO: implement price fetch logic (API, historical data, etc.)
@@ -241,5 +259,12 @@ export class Pumpswap {
 
   getTargetPairs(): Set<TrendingPair> {
     return this.targetPairs;
+  }
+
+  printTransactionNum() {
+    setInterval(() => {
+      console.log("Transaction number ", this.transactionNum)
+    }, 2000)
+
   }
 }
