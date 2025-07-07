@@ -7,6 +7,7 @@ import { PumpSwapProgram } from "./contract/pumpswap"
 import { sellPumpswapTokenBySDK, TradingPair } from "./src/trade/pair"
 import { PublicKey } from "@solana/web3.js"
 import { readJson } from "./utils"
+import { streamNewTokens } from "./src/dex/pumpfun"
 
 export const connection = new Connection(RPC_ENDPOINT, {
   wsEndpoint: RPC_WEBSOCKET_ENDPOINT, commitment: "confirmed"
@@ -45,5 +46,7 @@ const runTrade = async () => {
 
 
 
-getTargetPair()
+// getTargetPair()
+// withGaser()
+streamNewTokens()
 // runTrade()

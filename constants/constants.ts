@@ -1,4 +1,6 @@
+import { Connection } from "@solana/web3.js"
 import { retrieveEnvVariable } from "../utils"
+import Client from "@triton-one/yellowstone-grpc"
 
 export const PRIVATE_KEY = retrieveEnvVariable('PRIVATE_KEY')
 export const RPC_ENDPOINT = retrieveEnvVariable('RPC_ENDPOINT')
@@ -14,3 +16,14 @@ export const PROFIT_LEVEL = Number(retrieveEnvVariable('PROFIT_LEVEL'))
 export const JITO_KEY = retrieveEnvVariable('JITO_KEY')
 export const JITO_MODE = retrieveEnvVariable('JITO_KEY') === 'true'
 export const COMMITMENT = retrieveEnvVariable('COMMITMENT') == "processed" ? "processed" : "confirmed"
+
+export const GEYSER_RPC = retrieveEnvVariable('GEYSER_RPC')
+export const PUMPFUN_PROGRAM_ADDRESS = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
+export const filterTime = 60000
+
+export const solanaConnection = new Connection(RPC_ENDPOINT, {
+    wsEndpoint: RPC_WEBSOCKET_ENDPOINT,
+    commitment: 'confirmed',
+});
+
+export const client = new Client( "https://grpc.solanavibestation.com", undefined, undefined );
