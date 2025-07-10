@@ -135,25 +135,26 @@ export const analyzeToken = async (pairId: string) => {
     const result = await data.json()
 
     const { stats_min5, stats_hour1, stats_hour4, stats_hour12, stats_day1 } = result.data.getDetailedStats
-    const analyzedResult = analyzeTokenStats(
-      {
-        "5min": stats_min5,
-        "1hr": stats_hour1,
-        // "4hr": stats_hour4,
-        // "12hr": stats_hour12,
-        // "1d": stats_day1
-      },
-      {
-        buySellRatio: 1,
-        buyVolumeChange: 1,
-        sellVolumeChange: 1,
-        buysChange: 1,
-        transactionsChange: 1,
-        priceChange: 1,
-        consistency: 1
-      }
-    )
-    return analyzedResult
+    return {stats_min5, stats_hour1, stats_hour4, stats_hour12, stats_day1}
+    // const analyzedResult = analyzeTokenStats(
+    //   {
+    //     "5min": stats_min5,
+    //     "1hr": stats_hour1,
+    //     // "4hr": stats_hour4,
+    //     // "12hr": stats_hour12,
+    //     // "1d": stats_day1
+    //   },
+    //   {
+    //     buySellRatio: 1,
+    //     buyVolumeChange: 1,
+    //     sellVolumeChange: 1,
+    //     buysChange: 1,
+    //     transactionsChange: 1,
+    //     priceChange: 1,
+    //     consistency: 1
+    //   }
+    // )
+    // return analyzedResult
   } catch (error) {
     console.error("Error fetching volume data");
   }

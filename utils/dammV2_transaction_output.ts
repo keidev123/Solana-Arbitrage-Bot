@@ -1,3 +1,5 @@
+import { NATIVE_MINT } from "@solana/spl-token";
+
 export function meteoradammV2TransactionOutput(parsedInstruction: any, txn: any) {
   let output = {};
   let SOL = "So11111111111111111111111111111111111111112"
@@ -5,29 +7,53 @@ export function meteoradammV2TransactionOutput(parsedInstruction: any, txn: any)
     (instruction: any) => instruction.name === 'swap'
   );
   if (!swapInstruction) return;
+  
   const input_amount = swapInstruction.args.params.amount_in;
-  const pool_authority = swapInstruction.accounts.find((a: { name: string; }) => a.name == "pool_authority").pubkey;
-  const mint_a = swapInstruction.accounts.find((a: { name: string; }) => a.name === "token_a_mint").pubkey;
-  const mint_b = swapInstruction.accounts.find((a: { name: string; }) => a.name === "token_b_mint").pubkey;
-  const payer = swapInstruction.accounts.find((a: { name: string; }) => a.name === "payer").pubkey;
-  const preTokenBalances = txn.meta.preTokenBalances.find((a: { owner: any; mint: string; })=> a.owner === pool_authority && a.mint != SOL)?.uiTokenAmount?.uiAmount;
-  const postTokenBalance = txn.meta.postTokenBalances.find((a: { owner: any; mint: string; })=> a.owner === pool_authority && a.mint != SOL)?.uiTokenAmount?.uiAmount;
+  const pool_authority = swapInstruction.accounts.find((a: { name: string; }) => a.name == "pool_authority")?.pubkey;
+  const mint_a = swapInstruction.accounts.find((a: { name: string; }) => a.name === "token_a_mint")?.pubkey;
+  const mint_b = swapInstruction.accounts.find((a: { name: string; }) => a.name === "token_b_mint")?.pubkey;
+  const payer = swapInstruction.accounts.find((a: { name: string; }) => a.name === "payer")?.pubkey;
+  
+  if (!pool_authority || !mint_a || !mint_b || !payer) {
+    console.log("Missing required account data in swap instruction");
+    return;
+  }
+  
+  let preTokenBalances = txn.meta?.preTokenBalances?.find((a: { owner: any; mint: string; })=> a.owner === pool_authority && a.mint != SOL)?.uiTokenAmount?.uiAmount;
+  let preQuoteBalances = txn.meta?.preTokenBalances?.find((a: { owner: any; mint: string; })=> a.owner === pool_authority && a.mint == SOL)?.uiTokenAmount?.uiAmount;
+  let postTokenBalance = txn.meta?.postTokenBalances?.find((a: { owner: any; mint: string; })=> a.owner === pool_authority && a.mint != SOL)?.uiTokenAmount?.uiAmount;
+  let postBaseBalance = txn.meta?.postTokenBalances?.find((a: { owner: any; mint: string; })=> a.owner === pool_authority && a.mint == SOL)?.uiTokenAmount?.uiAmount;
+  
+  if (preTokenBalances === undefined || postTokenBalance === undefined || postBaseBalance === undefined) {
+    console.log("Missing token balance data");
+    return;
+  }
+  
   const buy_sell_determiner = preTokenBalances > postTokenBalance ? "Buy" : "Sell";
 
+  let price = postBaseBalance / postTokenBalance
+  if (!postTokenBalance || postTokenBalance === 0) {
+    console.log("Invalid post token balance");
+    return;
+  }
+  
+  const tokenPrice = price.toFixed(20).replace(/0+$/, '');
 
   const outputTransfer = parsedInstruction.inner_ixs.find(
     (ix: any) =>
       ix.name === "transferChecked" &&
-      ix.args.amount != input_amount
+      ix.args && ix.args.amount != input_amount
   );
  
   const event_type = {
     type: buy_sell_determiner,
     user: payer,
-    mint_a: mint_a,
-    mint_b: mint_b,
+    mint: mint_a,
     amount_in: input_amount,
-    amount_out: outputTransfer.args.amount
+    amount_out: outputTransfer && outputTransfer.args ? outputTransfer.args.amount : 0,
+    baseTokenBalance: postTokenBalance,
+    quoteTokenBalance: postBaseBalance,
+    price: tokenPrice
   };
 
   if (txn.version === 0) {

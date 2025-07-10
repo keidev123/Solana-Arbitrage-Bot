@@ -1,4 +1,3 @@
-require('dotenv').config()
 import Client, {
   CommitmentLevel,
   SubscribeRequestAccountsDataSlice,
@@ -9,20 +8,20 @@ import Client, {
   SubscribeRequestFilterSlots,
   SubscribeRequestFilterTransactions,
 } from "@triton-one/yellowstone-grpc";
-import { SubscribeRequestPing } from "@triton-one/yellowstone-grpc/dist/types/grpc/geyser";
 import { PublicKey, VersionedTransactionResponse } from "@solana/web3.js";
 import { Idl } from "@coral-xyz/anchor";
 import { SolanaParser } from "@shyft-to/solana-transaction-parser";
+import { SubscribeRequestPing } from "@triton-one/yellowstone-grpc/dist/types/grpc/geyser";
 import { TransactionFormatter } from "../../utils/transaction-formatter";
-import meteoraDLMMIdl from "../idl/meteora_dlmm.json";
 import { SolanaEventParser } from "../../utils/event-parser";
 import { bnLayoutFormatter } from "../../utils/bn-layout-formatter";
-import { transactionOutput } from "../../utils/dlmm_transaction_output";
+import pumpSwapAmmIdl from "../idl/pumpswap.json";
+import { parseSwapTransactionOutput } from "../../utils/swapTransactionParser";
 import { client } from "../../constants";
 import { arbitrageAggregator } from "./arbitrageAggregator";
 
-// Aggregator for Meteora DLMM events by token mint
-export type DlmmTrendingStat = {
+// Aggregator for pumpSwap events by token mint
+export type PumpswapTrendingStat = {
   type: string;
   user: string;
   mint: string;
@@ -33,22 +32,23 @@ export type DlmmTrendingStat = {
   price: string;
 };
 
-export class DlmmAggregator {
-  private tokenStats: Map<string, DlmmTrendingStat> = new Map();
+export class PumpswapAggregator {
+  private tokenStats: Map<string, PumpswapTrendingStat> = new Map();
 
-  update(event: DlmmTrendingStat) {
+  update(event: PumpswapTrendingStat) {
     if (!event || !event.mint) return;
+    // Save or update the latest event for this mint
     this.tokenStats.set(event.mint, event);
   }
 
-  getAllStats(): DlmmTrendingStat[] {
+  getAllStats(): PumpswapTrendingStat[] {
     return Array.from(this.tokenStats.values());
   }
 }
 
-const dlmmAggregator = new DlmmAggregator();
-// Start auto-filtering every 10 seconds
-// dlmmAggregator.startAutoFilter(10000);
+const pumpswapAggregator = new PumpswapAggregator();
+// Start auto-filtering every 1 minute
+// pumpswapAggregator.startAutoFilter(10000);
 
 interface SubscribeRequest {
   accounts: { [key: string]: SubscribeRequestFilterAccounts };
@@ -64,8 +64,8 @@ interface SubscribeRequest {
 }
 
 const TXN_FORMATTER = new TransactionFormatter();
-const METEORA_DLMM_PROGRAM_ID = new PublicKey(
-  "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo",
+const PUMP_AMM_PROGRAM_ID = new PublicKey(
+  "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
 );
 const COMPUTE_BUDGET_PROGRAM_ID = new PublicKey(
   "ComputeBudget111111111111111111111111111111",
@@ -110,19 +110,37 @@ const computeBudgetIdl: Idl = {
   errors: [],
 };
 
-const METEORA_DLMM_IX_PARSER = new SolanaParser([]);
+const PUMP_AMM_IX_PARSER = new SolanaParser([]);
+PUMP_AMM_IX_PARSER.addParserFromIdl(
+  PUMP_AMM_PROGRAM_ID.toBase58(),
+  pumpSwapAmmIdl as Idl
+);
 // Add ComputeBudget parser to prevent console errors
-METEORA_DLMM_IX_PARSER.addParserFromIdl(
+PUMP_AMM_IX_PARSER.addParserFromIdl(
   COMPUTE_BUDGET_PROGRAM_ID.toBase58(),
   computeBudgetIdl,
 );
 
-const METEORA_DLMM_EVENT_PARSER = new SolanaEventParser([], console);
+const PUMP_AMM_EVENT_PARSER = new SolanaEventParser([], console);
+PUMP_AMM_EVENT_PARSER.addParserFromIdl(
+  PUMP_AMM_PROGRAM_ID.toBase58(),
+  pumpSwapAmmIdl as Idl
+);
 
 async function handleStream(client: Client, args: SubscribeRequest) {
-  console.log("Streaming Swap events for Meteora DLMM...");
   // Subscribe for events
-  const stream = await client.subscribe();
+   console.log("Subscribing to Token Price Pump AMM transactions...");
+//   const stream = await client.subscribe();
+  const stream = await client.subscribe({
+  accounts: {
+    meteora_pools: {  },
+    pumpswap_pools: {  }
+  },
+  transactions: {
+    arbitrage_opportunities: { / Program filters */ }
+  }
+});
+
 
   // Create `error` / `end` handler
   const streamClosed = new Promise<void>((resolve, reject) => {
@@ -141,34 +159,30 @@ async function handleStream(client: Client, args: SubscribeRequest) {
 
   // Handle updates
   stream.on("data", (data) => {
-    // console.log("🚀 ~ stream.on ~ data:", data)
     if (data?.transaction) {
       const txn = TXN_FORMATTER.formTransactionFromJson(
         data.transaction,
-        Date.now(),
+        Date.now()
       );
-      const parsedInstruction = decodeMeteoraDLMM(txn);
 
-      if (!parsedInstruction) return;
-      const tOutput = transactionOutput(parsedInstruction,txn)
-      if(!tOutput) return;
-      
-      // Update token stats
-      // dlmmAggregator.update(tOutput);
-      
-      // Update global arbitrage aggregator
-      arbitrageAggregator.updateFromDlmm(tOutput);
-      
-      // Uncomment below to see individual transactions
-      console.log(
-        new Date(),
-        ":",
-        `New transaction https://translator.shyft.to/tx/${txn.transaction.signatures[0]} \n`,
-        JSON.stringify(tOutput, null, 2) + "\n"
-      );
-      console.log(
-        "--------------------------------------------------------------------------------------------------"
-      );
+      const parsedTxn = decodePumpAmmTxn(txn);
+
+      if (!parsedTxn) return;
+     const formattedSwapTxn = parseSwapTransactionOutput(parsedTxn,txn);
+     if(!formattedSwapTxn) return;
+      // console.log(
+      //   new Date(),
+      //   ":",
+      //   `New transaction https://translator.shyft.to/tx/${txn.transaction.signatures[0]} \n`,
+      //   // JSON.stringify(formattedSwapTxn.output, null, 2) + "\n",
+      //   formattedSwapTxn.transactionEvent
+      // );
+      // Save or update the latest event for this mint
+      pumpswapAggregator.update(formattedSwapTxn.transactionEvent);
+      // setTimeout(() => {
+      //   console.log("pumpswapAggregator", pumpswapAggregator.getAllStats());
+      // }, 30000);
+      arbitrageAggregator.updateFromPumpSwap(formattedSwapTxn.transactionEvent);
     }
   });
 
@@ -182,7 +196,7 @@ async function handleStream(client: Client, args: SubscribeRequest) {
       }
     });
   }).catch((reason) => {
-    console.error(reason);
+    console.log("reason ==>",reason);
     throw reason;
   });
 
@@ -200,16 +214,15 @@ async function subscribeCommand(client: Client, args: SubscribeRequest) {
   }
 }
 
-
 const req: SubscribeRequest = {
   accounts: {},
   slots: {},
   transactions: {
-    Meteora_DLMM: {
+    pumpFun: {
       vote: false,
       failed: false,
       signature: undefined,
-      accountInclude: [METEORA_DLMM_PROGRAM_ID.toBase58()],
+      accountInclude: [PUMP_AMM_PROGRAM_ID.toBase58()],
       accountExclude: [],
       accountRequired: [],
     },
@@ -225,58 +238,30 @@ const req: SubscribeRequest = {
 
 subscribeCommand(client, req);
 
-function decodeMeteoraDLMM(tx: VersionedTransactionResponse) {
+function decodePumpAmmTxn(tx: VersionedTransactionResponse) {
   if (tx.meta?.err) return;
-  
-  try {
-    // Check if this transaction contains DLMM program instructions
-    let hasDLMMInstruction = false;
-    
-    if ('instructions' in tx.transaction.message) {
-      hasDLMMInstruction = tx.transaction.message.instructions.some((ix: any) =>
-        ix.programId && ix.programId.equals && ix.programId.equals(METEORA_DLMM_PROGRAM_ID)
-      );
-    } else if ('compiledInstructions' in tx.transaction.message) {
-      const accountKeys = tx.transaction.message.staticAccountKeys;
-      hasDLMMInstruction = tx.transaction.message.compiledInstructions.some((ix: any) => {
-        const programId = accountKeys[ix.programIdIndex];
-        return programId && programId.equals && programId.equals(METEORA_DLMM_PROGRAM_ID);
-      });
-    }
-    
-    if (!hasDLMMInstruction) return;
-    
-    // Check log messages for swap instruction
-    const logMessages = tx.meta?.logMessages || [];
-    const hasSwapInstruction = logMessages.some((log: string) => 
-      log.includes("Instruction: Swap")
-    );
-    
-    if (!hasSwapInstruction) return;
-    
-    // Create a basic result structure for swap events
-    const result = {
-      instructions: [],
-      inner_ixs: [],
-      events: [{
-        name: 'Swap',
-        lbPair: '', // Will be extracted from transaction
-        from: '', // Will be extracted from transaction
-        startBinId: 0,
-        endBinId: 0,
-        amountIn: 0,
-        amountOut: 0,
-        swapForY: false,
-        fee: 0,
-        protocolFee: 0,
-        feeBps: 0,
-        hostFee: 0
-      }]
-    };
-    
-    return result;
-  } catch (err) {
-    console.error("Error parsing DLMM transaction:", err);
-    return;
+  try{
+  const paredIxs = PUMP_AMM_IX_PARSER.parseTransactionData(
+    tx.transaction.message,
+    tx.meta?.loadedAddresses,
+  );
+
+  const pumpAmmIxs = paredIxs.filter((ix) =>
+    ix.programId.equals(PUMP_AMM_PROGRAM_ID) || ix.programId.equals(new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")),
+  );
+
+  const parsedInnerIxs = PUMP_AMM_IX_PARSER.parseTransactionWithInnerInstructions(tx);
+
+  const pump_amm_inner_ixs = parsedInnerIxs.filter((ix) =>
+    ix.programId.equals(PUMP_AMM_PROGRAM_ID) || ix.programId.equals(new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")),
+  );
+
+
+  if (pumpAmmIxs.length === 0) return;
+  const events = PUMP_AMM_EVENT_PARSER.parseEvent(tx);
+  const result = { instructions: {pumpAmmIxs,events}, inner_ixs:  pump_amm_inner_ixs };
+  bnLayoutFormatter(result);
+  return result;
+  }catch(err){
   }
 }

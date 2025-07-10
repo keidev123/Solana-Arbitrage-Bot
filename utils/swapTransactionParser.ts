@@ -1,6 +1,17 @@
 export function parseSwapTransactionOutput(parsedInstruction: any, transaction: any) {
     const SOL_MINT = 'So11111111111111111111111111111111111111112';
-    let output = {};
+    let price;
+
+    const nonSolBalance = transaction.meta?.preTokenBalances?.find(
+        (instruction: any) => instruction.mint != SOL_MINT     
+    );
+    
+    if (!nonSolBalance || !nonSolBalance.uiTokenAmount) {
+        console.log("No non-SOL token balance found in transaction");
+        return;
+    }
+    
+    const decimal = nonSolBalance.uiTokenAmount.decimals;
 
     const swapInstruction = parsedInstruction.instructions.pumpAmmIxs.find(
         (instruction: any) => instruction.name === 'buy' || instruction.name === 'sell'
@@ -10,9 +21,34 @@ export function parseSwapTransactionOutput(parsedInstruction: any, transaction: 
         return;
     }
 
+    const baseMintPubkey = swapInstruction.accounts.find((account: any) => account.name === 'base_mint')?.pubkey;
+
+     const parsedEvent = parsedInstruction.instructions.events[0]?.data;
+    if (!parsedEvent) {
+        console.log("No parsed event data found");
+        return;
+    }
+    
+    const pool_base_token_reserves = parsedEvent.pool_base_token_reserves;
+    const pool_quote_token_reserves = parsedEvent.pool_quote_token_reserves;
+
+     if(baseMintPubkey === SOL_MINT){
+        price = calculatePumpAmmPrice(
+            pool_base_token_reserves,
+            pool_quote_token_reserves,
+            decimal
+        );
+    }else {
+        price = calculatePumpAmmPrice(
+            pool_quote_token_reserves,
+            pool_base_token_reserves,
+            decimal
+        );
+    }
+
+    const formattedPrice = price.toFixed(20).replace(/0+$/, ''); 
+
     const signerPubkey = swapInstruction.accounts.find((account: any) => account.name === 'user')?.pubkey;
-    const user_quote_token_account = swapInstruction.accounts.find((account: any) => account.name === "user_quote_token_account")?.pubkey;
-    const pool_base_token_account = swapInstruction.accounts.find((account: any) => account.name === "pool_base_token_account")?.pubkey;
 
     const swapAmount = swapInstruction.name === 'sell'
         ? swapInstruction.args?.base_amount_in
@@ -48,7 +84,13 @@ export function parseSwapTransactionOutput(parsedInstruction: any, transaction: 
     };
 
     const buySellEvent = determineBuySellEvent();
-  const base_amount_in = swapInstruction.name === 'sell'
+    if (!buySellEvent.mint) {
+        console.log("Could not determine mint for buy/sell event");
+        return;
+    }
+    
+    const poolId = swapInstruction.accounts.find((account: any) => account.name === 'pool')?.pubkey || null;
+    const base_amount_in = swapInstruction.name === 'sell'
         ? swapInstruction.args?.base_amount_in
         : swapInstruction.args?.base_amount_out;
      
@@ -56,32 +98,30 @@ export function parseSwapTransactionOutput(parsedInstruction: any, transaction: 
         ? determineOutAmount()
         : base_amount_in;
 
- const amountOut = swapInstruction.name === 'sell'
+    const amountOut = swapInstruction.name === 'sell'
         ? determineOutAmount()
         : base_amount_in;
     const transactionEvent = {
         type: buySellEvent.type,
         user: signerPubkey,
         mint: buySellEvent.mint,
-        out_amount: amountOut,
-        in_amount: amountIn, 
+        amount_in: amountIn,
+        amount_out: amountOut,
+        baseTokenBalance: pool_base_token_reserves,
+        quoteTokenBalance: pool_quote_token_reserves,
+        price: formattedPrice
     };
 
-
-    output = {
-        ...transaction,
-        meta: {
-            ...transaction.meta,
-            innerInstructions: parsedInstruction.inner_ixs,
-        },
-        transaction: {
-            ...transaction.transaction,
-            message: {
-                ...transaction.transaction.message,
-                compiledInstructions: parsedInstruction.instructions,
-            },
-        }
-    };
 
     return { transactionEvent };
+}
+
+function calculatePumpAmmPrice(
+    pool_base_reserve: number,
+    pool_quote_reserve: number,
+    decimal : number
+): number {
+    const base = pool_base_reserve/ 1_000_000_000;;
+    const quote = pool_quote_reserve/ Math.pow(10, decimal);
+    return base / quote;
 }

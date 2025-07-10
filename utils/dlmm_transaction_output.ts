@@ -8,6 +8,9 @@ export function transactionOutput(parsedInstruction: any, txn: any) {
 
   if (!swapEvent) return;
 
+  const input_amount = swapEvent.args.params.amount_in;
+  console.log("🚀 ~ transactionOutput ~ swapEvent:", swapEvent)
+
   // Extract basic transaction info
   const signature = txn.transaction.signatures[0];
   const logMessages = txn.meta?.logMessages || [];
@@ -149,16 +152,31 @@ export function transactionOutput(parsedInstruction: any, txn: any) {
       }
     }
   }
+
+  let price = amountIn / amountOut
+  if (!amountOut || amountIn === 0) {
+    console.log("Invalid post token balance");
+    return;
+  }
+
+  const outputTransfer = parsedInstruction.inner_ixs.find(
+    (ix: any) =>
+      ix.name === "transferChecked" &&
+      ix.args && ix.args.amount != input_amount
+  );
+  
+  const tokenPrice = price.toFixed(20).replace(/0+$/, '');
   
   // Create the swap data object
   const swapData = {
     type: event_type,
     user: user,
-    pool: lbPair,
-    tokenAmount: amountIn,
-    solAmount: amountOut,
     mint: mintIn,
-    signature: signature
+    amount_in: input_amount,
+    amount_out: outputTransfer && outputTransfer.args ? outputTransfer.args.amount : 0,
+    baseTokenBalance: amountIn,
+    quoteTokenBalance: amountOut,
+    price: tokenPrice
   };
 
   // Return the formatted transaction with swap data

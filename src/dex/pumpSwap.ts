@@ -18,155 +18,37 @@ import { bnLayoutFormatter } from "../../utils/bn-layout-formatter";
 import pumpSwapAmmIdl from "../idl/pumpswap.json";
 import { parseSwapTransactionOutput } from "../../utils/swapTransactionParser";
 import { client } from "../../constants";
+import { arbitrageAggregator } from "./arbitrageAggregator";
 
 // Aggregator for pumpSwap events by token mint
 export type PumpswapTrendingStat = {
-  tokenAddress: string;
-  sell_volume: number;
-  buy_volume: number;
-  transaction_count: number;
+  type: string;
+  user: string;
+  mint: string;
+  amount_in: number;
+  amount_out: number;
+  baseTokenBalance: number;
+  quoteTokenBalance: number;
+  price: string;
 };
 
 export class PumpswapAggregator {
   private tokenStats: Map<string, PumpswapTrendingStat> = new Map();
-  private filterInterval: NodeJS.Timeout | null = null;
 
-  update(event: {
-    type?: string;
-    mint?: string;
-    out_amount?: number;
-    in_amount?: number;
-  }) {
+  update(event: PumpswapTrendingStat) {
     if (!event || !event.mint) return;
-    const tokenAddress = event.mint;
-    let stat = this.tokenStats.get(tokenAddress);
-    if (!stat) {
-      stat = {
-        tokenAddress,
-        sell_volume: 0,
-        buy_volume: 0,
-        transaction_count: 0,
-      };
-      this.tokenStats.set(tokenAddress, stat);
-    }
-    
-    if (event.type === 'Buy') {
-      stat.buy_volume += Number(event.in_amount || 0);
-    } else if (event.type === 'Sell') {
-      stat.sell_volume += Number(event.out_amount || 0);
-    }
-    stat.transaction_count += 1;
+    // Save or update the latest event for this mint
+    this.tokenStats.set(event.mint, event);
   }
 
   getAllStats(): PumpswapTrendingStat[] {
     return Array.from(this.tokenStats.values());
   }
-
-  startAutoFilter(intervalMs: number = 10000) {
-    if (this.filterInterval) clearInterval(this.filterInterval);
-    this.filterInterval = setInterval(() => {
-      console.log(" ======= TOP INTERMEDIATE MINTS BY VOULME ======= ")
-      this.printTable();
-      console.log("\n\n NOW UPDATING DATA, WATING 1 MINUTE ....")
-    }, intervalMs);
-  }
-
-  stopAutoFilter() {
-    if (this.filterInterval) clearInterval(this.filterInterval);
-    this.filterInterval = null;
-  }
-
-  // Return only tokens where buy_volume > sell_volume
-  filterTokenStat(): PumpswapTrendingStat[] {
-    return Array.from(this.tokenStats.values()).filter(stat => stat.buy_volume > stat.sell_volume);
-  }
-
-  // Sort by (buy_volume - sell_volume) descending, then by buy_volume descending
-  sortByVolume(): PumpswapTrendingStat[] {
-    return this.filterTokenStat().sort((a, b) => {
-      const diffA = a.buy_volume - a.sell_volume;
-      const diffB = b.buy_volume - b.sell_volume;
-      if (diffB !== diffA) return diffB - diffA;
-      return b.buy_volume - a.buy_volume;
-    });
-  }
-
-  // Print formatted table to console
-  printTable(): void {
-    const sortedStats = this.sortByVolume();
-    if (sortedStats.length === 0) {
-      console.log("[PumpswapAggregator] No tokens with buy_volume > sell_volume");
-      return;
-    }
-
-    // Table headers and column widths
-    const headers = [
-      'Rank',
-      'tokenAddress',
-      'sell_volume',
-      'buy_volume',
-      'Txns'
-    ];
-    const colWidths = [6, 48, 20, 20, 8];
-    const totalWidth = colWidths.reduce((a, b) => a + b, 0) + headers.length + 1;
-
-    // Box-drawing characters
-    const h = '─', v = '│', tl = '┌', tr = '┐', bl = '└', br = '┘', l = '├', r = '┤', t = '┬', b = '┴', c = '┼';
-
-    // Helper to pad and align
-    const pad = (str: string, len: number, align: 'left' | 'right' = 'left') => {
-      if (str.length > len) return str.slice(0, len);
-      return align === 'left' ? str.padEnd(len, ' ') : str.padStart(len, ' ');
-    };
-
-    // Top border
-    let line = tl;
-    for (let i = 0; i < headers.length; i++) {
-      line += h.repeat(colWidths[i]);
-      line += i === headers.length - 1 ? tr : t;
-    }
-    console.log(line);
-
-    // Header row
-    let headerRow = v;
-    for (let i = 0; i < headers.length; i++) {
-      headerRow += pad(headers[i], colWidths[i], 'left') + v;
-    }
-    console.log(headerRow);
-
-    // Header separator
-    line = l;
-    for (let i = 0; i < headers.length; i++) {
-      line += h.repeat(colWidths[i]);
-      line += i === headers.length - 1 ? r : c;
-    }
-    console.log(line);
-
-    // Data rows
-    sortedStats.forEach((stat, idx) => {
-      let row = v;
-      row += pad((idx + 1).toString(), colWidths[0], 'right') + v;
-      row += pad(stat.tokenAddress, colWidths[1], 'left') + v;
-      row += pad(stat.sell_volume.toString(), colWidths[2], 'right') + v;
-      row += pad(stat.buy_volume.toString(), colWidths[3], 'right') + v;
-      row += pad(stat.transaction_count.toString(), colWidths[4], 'right') + v;
-      console.log(row);
-    });
-
-    // Bottom border
-    line = bl;
-    for (let i = 0; i < headers.length; i++) {
-      line += h.repeat(colWidths[i]);
-      line += i === headers.length - 1 ? br : b;
-    }
-    console.log(line);
-    console.log(`Total tokens: ${sortedStats.length}\n`);
-  }
 }
 
 const pumpswapAggregator = new PumpswapAggregator();
 // Start auto-filtering every 1 minute
-pumpswapAggregator.startAutoFilter(10000);
+// pumpswapAggregator.startAutoFilter(10000);
 
 interface SubscribeRequest {
   accounts: { [key: string]: SubscribeRequestFilterAccounts };
@@ -247,7 +129,7 @@ PUMP_AMM_EVENT_PARSER.addParserFromIdl(
 
 async function handleStream(client: Client, args: SubscribeRequest) {
   // Subscribe for events
-  console.log("Listening to Buy and Sell on Pumpfun Amm")
+   console.log("Subscribing to Token Price Pump AMM transactions...");
   const stream = await client.subscribe();
 
   // Create `error` / `end` handler
@@ -278,23 +160,19 @@ async function handleStream(client: Client, args: SubscribeRequest) {
       if (!parsedTxn) return;
      const formattedSwapTxn = parseSwapTransactionOutput(parsedTxn,txn);
      if(!formattedSwapTxn) return;
-    //   console.log(
-    //     new Date(),
-    //     ":",
-    //     `New transaction https://translator.shyft.to/tx/${txn.transaction.signatures[0]} \n`,
-    //     // JSON.stringify(formattedSwapTxn.output, null, 2) + "\n",
-    //     formattedSwapTxn.transactionEvent
-    //   );
       // console.log(
-      //   "Current Aggregated Stats:",
-      //   JSON.stringify(pumpswapAggregator.getAllStats(), null, 2)
+      //   new Date(),
+      //   ":",
+      //   `New transaction https://translator.shyft.to/tx/${txn.transaction.signatures[0]} \n`,
+      //   // JSON.stringify(formattedSwapTxn.output, null, 2) + "\n",
+      //   formattedSwapTxn.transactionEvent
       // );
-      // console.log(
-      //   "--------------------------------------------------------------------------------------------------"
-      // );
-
-      // Update token stats
+      // Save or update the latest event for this mint
       pumpswapAggregator.update(formattedSwapTxn.transactionEvent);
+      // setTimeout(() => {
+      //   console.log("pumpswapAggregator", pumpswapAggregator.getAllStats());
+      // }, 30000);
+      arbitrageAggregator.updateFromPumpSwap(formattedSwapTxn.transactionEvent);
     }
   });
 
@@ -308,8 +186,7 @@ async function handleStream(client: Client, args: SubscribeRequest) {
       }
     });
   }).catch((reason) => {
-    
-    console.error("123213",reason);
+    console.log("reason ==>",reason);
     throw reason;
   });
 

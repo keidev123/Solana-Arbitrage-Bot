@@ -19,160 +19,36 @@ import { SolanaEventParser } from "../../utils/event-parser";
 import { bnLayoutFormatter } from "../../utils/bn-layout-formatter";
 import { meteoradammV2TransactionOutput } from "../../utils/dammV2_transaction_output";
 import { client } from "../../constants";
+import { arbitrageAggregator } from "./arbitrageAggregator";
 
 // Aggregator for Meteora dammV2 events by token mint
 export type DammV2TrendingStat = {
-  tokenAddress: string;
-  sell_volume: number;
-  buy_volume: number;
-  transaction_count: number;
+  type: string;
+  user: string;
+  mint: string;
+  amount_in: number;
+  amount_out: number;
+  baseTokenBalance: number;
+  quoteTokenBalance: number;
+  price: string;
 };
 
 export class DammV2Aggregator {
   private tokenStats: Map<string, DammV2TrendingStat> = new Map();
-  private filterInterval: NodeJS.Timeout | null = null;
 
-  update(event: {
-    type?: string;
-    mint_a?: string;
-    mint_b?: string;
-    amount_in?: number;
-    amount_out?: number;
-  }) {
-    if (!event || !event.mint_a || !event.mint_b) return;
-    
-    // Determine which token is the non-SOL token
-    const SOL = "So11111111111111111111111111111111111111112";
-    const tokenAddress = event.mint_a === SOL ? event.mint_b : event.mint_a;
-    
-    let stat = this.tokenStats.get(tokenAddress);
-    if (!stat) {
-      stat = {
-        tokenAddress,
-        sell_volume: 0,
-        buy_volume: 0,
-        transaction_count: 0,
-      };
-      this.tokenStats.set(tokenAddress, stat);
-    }
-    
-    if (event.type === 'Buy') {
-      stat.buy_volume += Number(event.amount_in || 0);
-    } else if (event.type === 'Sell') {
-      stat.sell_volume += Number(event.amount_out || 0);
-    }
-    stat.transaction_count += 1;
+  update(event: DammV2TrendingStat) {
+    if (!event || !event.mint) return;
+    this.tokenStats.set(event.mint, event);
   }
 
   getAllStats(): DammV2TrendingStat[] {
     return Array.from(this.tokenStats.values());
   }
-
-  startAutoFilter(intervalMs: number = 10000) {
-    if (this.filterInterval) clearInterval(this.filterInterval);
-    this.filterInterval = setInterval(() => {
-      console.log(" ======= TOP INTERMEDIATE MINTS BY VOLUME (DAMMV2) ======= ")
-      this.printTable();
-      console.log("\n\n NOW UPDATING DATA, WAITING 1 MINUTE ....")
-    }, intervalMs);
-  }
-
-  stopAutoFilter() {
-    if (this.filterInterval) clearInterval(this.filterInterval);
-    this.filterInterval = null;
-  }
-
-  // Return only tokens where buy_volume > sell_volume
-  filterTokenStat(): DammV2TrendingStat[] {
-    return Array.from(this.tokenStats.values()).filter(stat => stat.buy_volume > stat.sell_volume);
-  }
-
-  // Sort by (buy_volume - sell_volume) descending, then by buy_volume descending
-  sortByVolume(): DammV2TrendingStat[] {
-    return this.filterTokenStat().sort((a, b) => {
-      const diffA = a.buy_volume - a.sell_volume;
-      const diffB = b.buy_volume - b.sell_volume;
-      if (diffB !== diffA) return diffB - diffA;
-      return b.buy_volume - a.buy_volume;
-    });
-  }
-
-  // Print formatted table to console
-  printTable(): void {
-    const sortedStats = this.sortByVolume();
-    if (sortedStats.length === 0) {
-      console.log("[DammV2Aggregator] No tokens with buy_volume > sell_volume");
-      return;
-    }
-
-    // Table headers and column widths
-    const headers = [
-      'Rank',
-      'tokenAddress',
-      'sell_volume',
-      'buy_volume',
-      'Txns'
-    ];
-    const colWidths = [6, 48, 20, 20, 8];
-    const totalWidth = colWidths.reduce((a, b) => a + b, 0) + headers.length + 1;
-
-    // Box-drawing characters
-    const h = '─', v = '│', tl = '┌', tr = '┐', bl = '└', br = '┘', l = '├', r = '┤', t = '┬', b = '┴', c = '┼';
-
-    // Helper to pad and align
-    const pad = (str: string, len: number, align: 'left' | 'right' = 'left') => {
-      if (str.length > len) return str.slice(0, len);
-      return align === 'left' ? str.padEnd(len, ' ') : str.padStart(len, ' ');
-    };
-
-    // Top border
-    let line = tl;
-    for (let i = 0; i < headers.length; i++) {
-      line += h.repeat(colWidths[i]);
-      line += i === headers.length - 1 ? tr : t;
-    }
-    console.log(line);
-
-    // Header row
-    let headerRow = v;
-    for (let i = 0; i < headers.length; i++) {
-      headerRow += pad(headers[i], colWidths[i], 'left') + v;
-    }
-    console.log(headerRow);
-
-    // Header separator
-    line = l;
-    for (let i = 0; i < headers.length; i++) {
-      line += h.repeat(colWidths[i]);
-      line += i === headers.length - 1 ? r : c;
-    }
-    console.log(line);
-
-    // Data rows
-    sortedStats.forEach((stat, idx) => {
-      let row = v;
-      row += pad((idx + 1).toString(), colWidths[0], 'right') + v;
-      row += pad(stat.tokenAddress, colWidths[1], 'left') + v;
-      row += pad(stat.sell_volume.toString(), colWidths[2], 'right') + v;
-      row += pad(stat.buy_volume.toString(), colWidths[3], 'right') + v;
-      row += pad(stat.transaction_count.toString(), colWidths[4], 'right') + v;
-      console.log(row);
-    });
-
-    // Bottom border
-    line = bl;
-    for (let i = 0; i < headers.length; i++) {
-      line += h.repeat(colWidths[i]);
-      line += i === headers.length - 1 ? br : b;
-    }
-    console.log(line);
-    console.log(`Total tokens: ${sortedStats.length}\n`);
-  }
 }
 
 const dammV2Aggregator = new DammV2Aggregator();
 // Start auto-filtering every 10 seconds
-dammV2Aggregator.startAutoFilter(10000);
+// dammV2Aggregator.startAutoFilter(10000);
 
 interface SubscribeRequest {
   accounts: { [key: string]: SubscribeRequestFilterAccounts };
@@ -280,11 +156,17 @@ async function handleStream(client: Client, args: SubscribeRequest) {
       const parsedInstruction = decodeMeteoradammV2(txn);
 
       if (!parsedInstruction) return;
-      const parsedMeteoradammV2 = meteoradammV2TransactionOutput(parsedInstruction,txn)
+      const parsedMeteoradammV2 = meteoradammV2TransactionOutput(parsedInstruction, txn)
       if(!parsedMeteoradammV2) return;
       
-      // Update token stats
+      // Save or update the latest event for this mint
       dammV2Aggregator.update(parsedMeteoradammV2);
+      
+      // setTimeout(() => {
+      //   console.log("dammV2Aggregator", dammV2Aggregator.getAllStats());
+      // }, 30000);
+      // Update global arbitrage aggregator
+      arbitrageAggregator.updateFromMeteora(parsedMeteoradammV2);
       
       // Uncomment below to see individual transactions
       // console.log(
@@ -350,8 +232,6 @@ const req: SubscribeRequest = {
 };
 
 subscribeCommand(client, req);
-
-
 
 function decodeMeteoradammV2(tx: VersionedTransactionResponse) {
   if (tx.meta?.err) return;
