@@ -223,7 +223,10 @@ const req: SubscribeRequest = {
   commitment: CommitmentLevel.CONFIRMED,
 };
 
-subscribeCommand(client, req);
+export const dlmmThread = () => {
+
+  subscribeCommand(client, req);
+}
 
 function decodeMeteoraDLMM(tx: VersionedTransactionResponse) {
   if (tx.meta?.err) return;

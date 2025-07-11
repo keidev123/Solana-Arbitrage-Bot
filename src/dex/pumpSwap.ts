@@ -226,7 +226,10 @@ const req: SubscribeRequest = {
   commitment: CommitmentLevel.CONFIRMED,
 };
 
-subscribeCommand(client, req);
+export const pumpSwapThread = () => {
+  
+  subscribeCommand(client, req);
+}
 
 function decodePumpAmmTxn(tx: VersionedTransactionResponse) {
   if (tx.meta?.err) return;

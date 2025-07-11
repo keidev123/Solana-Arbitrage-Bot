@@ -1,5 +1,9 @@
+import { PublicKey } from '@solana/web3.js';
 import dotenv from 'dotenv';
 import fs from 'fs';
+import { solanaConnection } from '../constants';
+import DLMM from '@meteora-ag/dlmm';
+import { CpAmm, getPriceFromSqrtPrice } from '@meteora-ag/cp-amm-sdk';
 
 dotenv.config();
 
@@ -108,32 +112,76 @@ export function deleteConsoleLines(numLines: number) {
 
 // Function to read JSON file
 export function readJson(filename: string = "data.json"): Data[] {
-    if (!fs.existsSync(filename)) {
-        // If the file does not exist, create an empty array
-        fs.writeFileSync(filename, '[]', 'utf-8');
-    }
-    const data = fs.readFileSync(filename, 'utf-8');
-    return JSON.parse(data) as Data[];
+  if (!fs.existsSync(filename)) {
+    // If the file does not exist, create an empty array
+    fs.writeFileSync(filename, '[]', 'utf-8');
+  }
+  const data = fs.readFileSync(filename, 'utf-8');
+  return JSON.parse(data) as Data[];
 }
 
 // Function to write JSON file
-export function writeJson( data: Data[], filename: string = "data.json",): void {
-    fs.writeFileSync(filename, JSON.stringify(data, null, 4), 'utf-8');
+export function writeJson(data: Data[], filename: string = "data.json",): void {
+  fs.writeFileSync(filename, JSON.stringify(data, null, 4), 'utf-8');
 }
 
 // Function to edit JSON file content
 export function editJson(newData: Partial<Data>, filename: string = "data.json"): void {
-  if(!newData.pubkey) {
+  if (!newData.pubkey) {
     console.log("Pubkey is not prvided as an argument")
     return
   }
   const wallets = readJson(filename);
   const index = wallets.findIndex(wallet => wallet.pubkey === newData.pubkey);
   if (index !== -1) {
-      wallets[index] = { ...wallets[index], ...newData };
-      writeJson(wallets, filename);
+    wallets[index] = { ...wallets[index], ...newData };
+    writeJson(wallets, filename);
   } else {
-      console.error(`Pubkey ${newData.pubkey} does not exist.`);
+    console.error(`Pubkey ${newData.pubkey} does not exist.`);
   }
 }
+
+export const getDlmmPrice = async (poolId: string) => {
+  try {
+    const USDC_USDT_POOL = new PublicKey(poolId) // You can get your desired pool address from the API https://dlmm-api.meteora.ag/pair/all
+    const dlmmPool = await DLMM.create(solanaConnection, USDC_USDT_POOL);
+
+    const activeBin = await dlmmPool.getActiveBin();
+    console.log("🚀 ~ activeBin:", activeBin.price)
+    const activeBinPriceLamport = activeBin.price;
+    const activeBinPricePerToken = dlmmPool.fromPricePerLamport(
+      Number(activeBin.price)
+    );
+    console.log("🚀 ~ activeBinPricePerToken:", activeBinPricePerToken)
+    return activeBinPricePerToken
+  } catch (err) {
+    console.log("get Dlmm price error", err)
+    return null
+  }
+
+}
+
+
+export const getDammV2Price = async (poolId: string) => {
+  try {
+    const USDC_USDT_POOL = new PublicKey(poolId)
+    const cpAmm = new CpAmm(solanaConnection);
+
+
+    const poolState = await cpAmm.fetchPoolState(USDC_USDT_POOL);
+    const price = getPriceFromSqrtPrice(
+      poolState.sqrtPrice,
+      6,  // USDC has 6 decimals
+      9   // SOL has 9 decimals
+    );
+    let tokenPrice = Number(price) * 1000
+    console.log(`Current price: ${tokenPrice} USDC per SOL`);
+    return tokenPrice
+  } catch (err) {
+    console.log("get Dlmm price error", err)
+    return null
+  }
+
+}
+
 

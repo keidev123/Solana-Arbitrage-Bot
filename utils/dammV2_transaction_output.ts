@@ -9,6 +9,7 @@ export function meteoradammV2TransactionOutput(parsedInstruction: any, txn: any)
   if (!swapInstruction) return;
   
   const input_amount = swapInstruction.args.params.amount_in;
+  
   const pool_authority = swapInstruction.accounts.find((a: { name: string; }) => a.name == "pool_authority")?.pubkey;
   const mint_a = swapInstruction.accounts.find((a: { name: string; }) => a.name === "token_a_mint")?.pubkey;
   const mint_b = swapInstruction.accounts.find((a: { name: string; }) => a.name === "token_b_mint")?.pubkey;

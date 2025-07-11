@@ -27,3 +27,5 @@ export const solanaConnection = new Connection(RPC_ENDPOINT, {
 });
 
 export const client = new Client( "https://grpc.solanavibestation.com", undefined, undefined );
+// export const client = new Client( "https://basic.grpc.solanavibestation.com", 'a74b5439be597b1c1e295eb4ac066904', undefined );
+// export const client = new Client( "https://grpc-ams-3.erpc.global", '2cd69a80-faa3-43fc-9991-6260d99ac3a7', undefined );

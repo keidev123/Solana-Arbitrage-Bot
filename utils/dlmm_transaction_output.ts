@@ -176,6 +176,7 @@ export function transactionOutput(parsedInstruction: any, txn: any) {
     amount_out: outputTransfer && outputTransfer.args ? outputTransfer.args.amount : 0,
     baseTokenBalance: amountIn,
     quoteTokenBalance: amountOut,
+    poolId: lbPair,
     price: tokenPrice
   };
 

@@ -231,7 +231,10 @@ const req: SubscribeRequest = {
   commitment: CommitmentLevel.CONFIRMED,
 };
 
-subscribeCommand(client, req);
+export const dammV2Thread = () => {
+
+  subscribeCommand(client, req);
+}
 
 function decodeMeteoradammV2(tx: VersionedTransactionResponse) {
   if (tx.meta?.err) return;
