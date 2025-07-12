@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 import Client, {
   CommitmentLevel,
   SubscribeRequestAccountsDataSlice,
@@ -200,10 +202,7 @@ const req: SubscribeRequest = {
   commitment: CommitmentLevel.CONFIRMED,
 };
 
-export const dlmmThread = () => {
-
-  subscribeCommand(client, req);
-}
+subscribeCommand(client, req);
 
 function decodeMeteoraDLMM(tx: VersionedTransactionResponse) {
   if (tx.meta?.err) return;

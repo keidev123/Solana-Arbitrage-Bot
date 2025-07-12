@@ -1,23 +1,26 @@
 import { Connection } from "@solana/web3.js"
 import { retrieveEnvVariable } from "../utils"
 import Client from "@triton-one/yellowstone-grpc"
+import dotenv from 'dotenv';
 
-export const PRIVATE_KEY = retrieveEnvVariable('PRIVATE_KEY')
-export const RPC_ENDPOINT = retrieveEnvVariable('RPC_ENDPOINT')
-export const RPC_WEBSOCKET_ENDPOINT = retrieveEnvVariable('RPC_WEBSOCKET_ENDPOINT')
-export const LIL_JIT_ENDPOINT = retrieveEnvVariable('LIL_JIT_ENDPOINT')
-export const LIL_JIT_WEBSOCKET_ENDPOINT = retrieveEnvVariable('LIL_JIT_WEBSOCKET_ENDPOINT')
-export const BLOCK_ENGINE_URL = retrieveEnvVariable('BLOCK_ENGINE_URL')
-export const TX_INTERVAL = Number(retrieveEnvVariable('TX_INTERVAL'))
-export const JITO_FEE = Number(retrieveEnvVariable('JITO_FEE'))
-export const SLIPPAGE = Number(retrieveEnvVariable('SLIPPAGE'))
-export const FEE_LEVEL = Number(retrieveEnvVariable('FEE_LEVEL'))
-export const PROFIT_LEVEL = Number(retrieveEnvVariable('PROFIT_LEVEL'))
-export const JITO_KEY = retrieveEnvVariable('JITO_KEY')
-export const JITO_MODE = retrieveEnvVariable('JITO_KEY') === 'true'
-export const COMMITMENT = retrieveEnvVariable('COMMITMENT') == "processed" ? "processed" : "confirmed"
+dotenv.config();
 
-export const GEYSER_RPC = retrieveEnvVariable('GEYSER_RPC')
+export const PRIVATE_KEY = process.env.PRIVATE_KEY
+export const RPC_ENDPOINT = process.env.RPC_ENDPOINT || ""
+export const RPC_WEBSOCKET_ENDPOINT = process.env.RPC_WEBSOCKET_ENDPOINT
+export const LIL_JIT_ENDPOINT = process.env.LIL_JIT_ENDPOINT
+export const LIL_JIT_WEBSOCKET_ENDPOINT = process.env.LIL_JIT_WEBSOCKET_ENDPOINT
+export const BLOCK_ENGINE_URL = process.env.BLOCK_ENGINE_URL
+export const TX_INTERVAL = Number(process.env.TX_INTERVAL)
+export const JITO_FEE = Number(process.env.JITO_FEE)
+export const SLIPPAGE = Number(process.env.SLIPPAGE)
+export const FEE_LEVEL = Number(process.env.FEE_LEVEL)
+export const PROFIT_LEVEL = Number(process.env.PROFIT_LEVEL)
+export const JITO_KEY = process.env.JITO_KEY
+export const JITO_MODE = process.env.JITO_KEY === 'true'
+export const COMMITMENT = process.env.COMMITMENT == "processed" ? "processed" : "confirmed"
+
+export const GEYSER_RPC = process.env.GEYSER_RPC
 export const PUMPFUN_PROGRAM_ADDRESS = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P"
 export const filterTime = 60000
 

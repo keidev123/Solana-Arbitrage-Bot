@@ -7,7 +7,7 @@ export function parseSwapTransactionOutput(parsedInstruction: any, transaction: 
     );
     
     if (!nonSolBalance || !nonSolBalance.uiTokenAmount) {
-        console.log("No non-SOL token balance found in transaction");
+        // console.log("No non-SOL token balance found in transaction");
         return;
     }
     
@@ -109,6 +109,7 @@ export function parseSwapTransactionOutput(parsedInstruction: any, transaction: 
         amount_out: amountOut,
         baseTokenBalance: pool_base_token_reserves,
         quoteTokenBalance: pool_quote_token_reserves,
+        poolId: poolId,
         price: formattedPrice
     };
 

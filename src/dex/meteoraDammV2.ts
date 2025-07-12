@@ -30,7 +30,8 @@ export type DammV2TrendingStat = {
   amount_out: number;
   baseTokenBalance: number;
   quoteTokenBalance: number;
-  price: string;
+  poolId: string;
+  price: any;
 };
 
 export class DammV2Aggregator {
@@ -147,7 +148,7 @@ async function handleStream(client: Client, args: SubscribeRequest) {
   });
 
   // Handle updates
-  stream.on("data", (data) => {
+  stream.on("data", async(data) => {
     if (data?.transaction) {
       const txn = TXN_FORMATTER.formTransactionFromJson(
         data.transaction,
@@ -156,7 +157,7 @@ async function handleStream(client: Client, args: SubscribeRequest) {
       const parsedInstruction = decodeMeteoradammV2(txn);
 
       if (!parsedInstruction) return;
-      const parsedMeteoradammV2 = meteoradammV2TransactionOutput(parsedInstruction, txn)
+      const parsedMeteoradammV2 = await meteoradammV2TransactionOutput(parsedInstruction, txn); 
       if(!parsedMeteoradammV2) return;
       
       // Save or update the latest event for this mint

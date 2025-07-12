@@ -9,17 +9,17 @@ console.log("📊 Running PumpSwap, Meteora DammV2, and Arbitrage Monitoring...\
 // Import both DEX services - they will start automatically
 async function startServices() {
   try {
-    // Import pumpSwap service
-    console.log("🔄 Starting PumpSwap service...");
-    await pumpSwapThread()
-    console.log("✅ PumpSwap service started");
+    // // Import pumpSwap service
+    // console.log("🔄 Starting PumpSwap service...");
+    // await pumpSwapThread()
+    // console.log("✅ PumpSwap service started");
     
-    // Import meteoraDammV2 service
-    console.log("🔄 Starting Meteora DammV2 service...");
-    await dammV2Thread()
-    console.log("✅ Meteora DammV2 service started");
+    // // Import meteoraDammV2 service
+    // console.log("🔄 Starting Meteora DammV2 service...");
+    // await dammV2Thread()
+    // console.log("✅ Meteora DammV2 service started");
 
-    // Import meteoraDammV2 service
+    // // Import meteoraDammV2 service
     console.log("🔄 Starting Meteora DammV2 service...");
     await dlmmThread()
     console.log("✅ Meteora DammV2 service started");
@@ -31,34 +31,12 @@ async function startServices() {
   }
 }
 
-// Function to print arbitrage opportunities periodically
-function startArbitrageMonitoring(intervalMs: number = 30000) {
-  console.log("🔍 Starting arbitrage monitoring...\n");
-  
-  setInterval(() => {
-    // Print arbitrage opportunities with 1% or higher difference
-    arbitrageAggregator.printArbitrageTable(1.0);
-    
-    // You can also get specific opportunities programmatically
-    const opportunities = arbitrageAggregator.getArbitrageOpportunities(1.0); // 1%+ opportunities
-    if (opportunities.length > 0) {
-      console.log(`🔥 Found ${opportunities.length} high-value arbitrage opportunities (1%+ difference)!`);
-      
-      // Example: Get the best opportunity
-      const bestOpportunity = opportunities[0];
-      console.log(`🏆 Best opportunity: ${bestOpportunity.mint} - ${bestOpportunity.arbitragePercentage?.toFixed(2)}% difference`);
-    }
-  }, intervalMs);
-}
-
 // Start everything
 async function main() {
   await startServices();
   
   // Start monitoring after services are initialized
-  setTimeout(() => {
-    startArbitrageMonitoring();
-  }, 5000);
+  // Remove startArbitrageMonitoring and setTimeout
 }
 
 // Handle graceful shutdown

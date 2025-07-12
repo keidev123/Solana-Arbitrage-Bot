@@ -143,26 +143,26 @@ export function editJson(newData: Partial<Data>, filename: string = "data.json")
 
 export const getDlmmPrice = async (poolId: string) => {
   try {
+    console.log("getDlmmPrice poolId ==>", poolId)
     const USDC_USDT_POOL = new PublicKey(poolId) // You can get your desired pool address from the API https://dlmm-api.meteora.ag/pair/all
     const dlmmPool = await DLMM.create(solanaConnection, USDC_USDT_POOL);
 
     const activeBin = await dlmmPool.getActiveBin();
-    console.log("🚀 ~ activeBin:", activeBin.price)
     const activeBinPriceLamport = activeBin.price;
     const activeBinPricePerToken = dlmmPool.fromPricePerLamport(
       Number(activeBin.price)
     );
-    console.log("🚀 ~ activeBinPricePerToken:", activeBinPricePerToken)
     return activeBinPricePerToken
   } catch (err) {
     console.log("get Dlmm price error", err)
-    return null
+    return 0
   }
 
 }
 
 
 export const getDammV2Price = async (poolId: string) => {
+  // console.log("getDammV2Price poolId ==>", poolId)
   try {
     const USDC_USDT_POOL = new PublicKey(poolId)
     const cpAmm = new CpAmm(solanaConnection);
@@ -174,12 +174,12 @@ export const getDammV2Price = async (poolId: string) => {
       6,  // USDC has 6 decimals
       9   // SOL has 9 decimals
     );
-    let tokenPrice = Number(price) * 1000
-    console.log(`Current price: ${tokenPrice} USDC per SOL`);
+    let tokenPrice = Number(price).toFixed(15)
+    // console.log(`Current price: ${tokenPrice} USDC per SOL`);
     return tokenPrice
   } catch (err) {
-    console.log("get Dlmm price error", err)
-    return null
+    console.log("get damm v2 price error", err)
+    return 0
   }
 
 }

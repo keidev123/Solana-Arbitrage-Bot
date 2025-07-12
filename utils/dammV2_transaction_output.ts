@@ -1,16 +1,18 @@
-import { NATIVE_MINT } from "@solana/spl-token";
+import { getDammV2Price } from "./utils";
 
-export function meteoradammV2TransactionOutput(parsedInstruction: any, txn: any) {
-  let output = {};
+export async function meteoradammV2TransactionOutput (parsedInstruction: any, txn: any) {
   let SOL = "So11111111111111111111111111111111111111112"
+  let output = {}
   const swapInstruction = parsedInstruction.instructions.find(
     (instruction: any) => instruction.name === 'swap'
   );
+  // console.log("🚀 ~ meteoradammV2TransactionOutput ~ swapInstruction:", swapInstruction)
   if (!swapInstruction) return;
   
   const input_amount = swapInstruction.args.params.amount_in;
   
   const pool_authority = swapInstruction.accounts.find((a: { name: string; }) => a.name == "pool_authority")?.pubkey;
+  const pool = swapInstruction.accounts.find((a: { name: string; }) => a.name == "pool")?.pubkey;
   const mint_a = swapInstruction.accounts.find((a: { name: string; }) => a.name === "token_a_mint")?.pubkey;
   const mint_b = swapInstruction.accounts.find((a: { name: string; }) => a.name === "token_b_mint")?.pubkey;
   const payer = swapInstruction.accounts.find((a: { name: string; }) => a.name === "payer")?.pubkey;
@@ -26,7 +28,7 @@ export function meteoradammV2TransactionOutput(parsedInstruction: any, txn: any)
   let postBaseBalance = txn.meta?.postTokenBalances?.find((a: { owner: any; mint: string; })=> a.owner === pool_authority && a.mint == SOL)?.uiTokenAmount?.uiAmount;
   
   if (preTokenBalances === undefined || postTokenBalance === undefined || postBaseBalance === undefined) {
-    console.log("Missing token balance data");
+    // console.log("Missing token balance data");
     return;
   }
   
@@ -38,7 +40,10 @@ export function meteoradammV2TransactionOutput(parsedInstruction: any, txn: any)
     return;
   }
   
-  const tokenPrice = price.toFixed(20).replace(/0+$/, '');
+  // const tokenPrice = price.toFixed(20).replace(/0+$/, '');
+  let tokenPrice = await getDammV2Price(pool.toString())
+   
+  // console.log("🚀 ~ meteoradammV2TransactionOutput ~ tokenPrice:", tokenPrice)
 
   const outputTransfer = parsedInstruction.inner_ixs.find(
     (ix: any) =>
@@ -54,6 +59,7 @@ export function meteoradammV2TransactionOutput(parsedInstruction: any, txn: any)
     amount_out: outputTransfer && outputTransfer.args ? outputTransfer.args.amount : 0,
     baseTokenBalance: postTokenBalance,
     quoteTokenBalance: postBaseBalance,
+    poolId: pool,
     price: tokenPrice
   };
 

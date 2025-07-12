@@ -9,7 +9,8 @@
     "arbitrage": "ts-node ./src/arbitrageBot.ts",
     "start": "ts-node ./src/excuteBot.ts",
     "unified-v1": "ts-node ./src/unifiedArbitrageBot.ts",
-    "price": "ts-node ./src/dex/index.ts"
+    "price": "ts-node ./src/dex/index.ts",
+    "test": "ts-node ./src/dex/dlmm.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.30.1",
