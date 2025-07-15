@@ -1,28 +1,25 @@
-import { arbitrageAggregator } from "./dex/arbitrageAggregator";
-import { dammV2Thread } from "./dex/meteoraDammV2";
-import { dlmmThread } from "./dex/meteoraDlmm";
-import { pumpSwapThread } from "./dex/pumpSwap";
+import { dammV2Thread } from "./scanner/meteoraDammV2";
+import { dlmmThread } from "./scanner/meteoraDlmm";
+import { pumpSwapThread } from "./scanner/pumpSwap";
 
-console.log("🚀 Starting Arbitrage Execution Bot...");
-console.log("📊 Running PumpSwap, Meteora DammV2, and Arbitrage Monitoring...\n");
 
 // Import both DEX services - they will start automatically
 async function startServices() {
   try {
-    // // Import pumpSwap service
-    // console.log("🔄 Starting PumpSwap service...");
-    // await pumpSwapThread()
-    // console.log("✅ PumpSwap service started");
+    // Import pumpSwap service
+    console.log("🔄 Starting PumpSwap service...");
+    await pumpSwapThread()
+    console.log("✅ PumpSwap service started");
     
-    // // Import meteoraDammV2 service
-    // console.log("🔄 Starting Meteora DammV2 service...");
-    // await dammV2Thread()
-    // console.log("✅ Meteora DammV2 service started");
+    // Import meteoraDammV2 service
+    console.log("🔄 Starting Meteora DammV2 service...");
+    await dammV2Thread()
+    console.log("✅ Meteora DammV2 service started");
 
     // // Import meteoraDammV2 service
-    console.log("🔄 Starting Meteora DammV2 service...");
+    console.log("🔄 Starting Meteora Dlmm service...");
     await dlmmThread()
-    console.log("✅ Meteora DammV2 service started");
+    console.log("✅ Meteora Dlmm service started");
     
     console.log("🎉 All services started successfully!");
   } catch (error) {
@@ -34,9 +31,6 @@ async function startServices() {
 // Start everything
 async function main() {
   await startServices();
-  
-  // Start monitoring after services are initialized
-  // Remove startArbitrageMonitoring and setTimeout
 }
 
 // Handle graceful shutdown

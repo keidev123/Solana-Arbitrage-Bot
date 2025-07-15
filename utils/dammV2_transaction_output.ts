@@ -2,12 +2,12 @@ import { getDammV2Price } from "./utils";
 
 export async function meteoradammV2TransactionOutput (parsedInstruction: any, txn: any) {
   let SOL = "So11111111111111111111111111111111111111112"
-  let output = {}
+  let output = {};
   const swapInstruction = parsedInstruction.instructions.find(
     (instruction: any) => instruction.name === 'swap'
   );
-  // console.log("🚀 ~ meteoradammV2TransactionOutput ~ swapInstruction:", swapInstruction)
   if (!swapInstruction) return;
+
   
   const input_amount = swapInstruction.args.params.amount_in;
   
@@ -40,10 +40,8 @@ export async function meteoradammV2TransactionOutput (parsedInstruction: any, tx
     return;
   }
   
-  // const tokenPrice = price.toFixed(20).replace(/0+$/, '');
   let tokenPrice = await getDammV2Price(pool.toString())
    
-  // console.log("🚀 ~ meteoradammV2TransactionOutput ~ tokenPrice:", tokenPrice)
 
   const outputTransfer = parsedInstruction.inner_ixs.find(
     (ix: any) =>

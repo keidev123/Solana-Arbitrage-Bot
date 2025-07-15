@@ -15,10 +15,10 @@ import { SubscribeRequestPing } from "@triton-one/yellowstone-grpc/dist/types/gr
 import { TransactionFormatter } from "../../utils/transaction-formatter";
 import { SolanaEventParser } from "../../utils/event-parser";
 import { bnLayoutFormatter } from "../../utils/bn-layout-formatter";
-import pumpSwapAmmIdl from "../idl/pumpswap.json";
+import pumpSwapAmmIdl from "../../idl/pumpswap.json";
 import { parseSwapTransactionOutput } from "../../utils/swapTransactionParser";
-import { client } from "../../constants";
-import { arbitrageAggregator } from "./arbitrageAggregator";
+import { client, PUMPSWAP_PROGRAM_ADDRESS } from "../../constants";
+import { arbitrageAggregator } from "../arbitrageAggregator";
 
 // Aggregator for pumpSwap events by token mint
 export type PumpswapTrendingStat = {
@@ -65,7 +65,7 @@ interface SubscribeRequest {
 
 const TXN_FORMATTER = new TransactionFormatter();
 const PUMP_AMM_PROGRAM_ID = new PublicKey(
-  "pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA"
+  PUMPSWAP_PROGRAM_ADDRESS
 );
 const COMPUTE_BUDGET_PROGRAM_ID = new PublicKey(
   "ComputeBudget111111111111111111111111111111",
@@ -129,68 +129,63 @@ PUMP_AMM_EVENT_PARSER.addParserFromIdl(
 
 async function handleStream(client: Client, args: SubscribeRequest) {
   // Subscribe for events
-   console.log("Subscribing to Token Price Pump AMM transactions...");
-  const stream = await client.subscribe();
+  try {
 
-  // Create `error` / `end` handler
-  const streamClosed = new Promise<void>((resolve, reject) => {
-    stream.on("error", (error) => {
-      console.log("ERROR", error);
-      reject(error);
-      stream.end();
-    });
-    stream.on("end", () => {
-      resolve();
-    });
-    stream.on("close", () => {
-      resolve();
-    });
-  });
+    console.log("Subscribing to Token Price Pump AMM transactions...");
+    const stream = await client.subscribe();
 
-  // Handle updates
-  stream.on("data", (data) => {
-    if (data?.transaction) {
-      const txn = TXN_FORMATTER.formTransactionFromJson(
-        data.transaction,
-        Date.now()
-      );
-
-      const parsedTxn = decodePumpAmmTxn(txn);
-
-      if (!parsedTxn) return;
-     const formattedSwapTxn = parseSwapTransactionOutput(parsedTxn,txn);
-     if(!formattedSwapTxn) return;
-      // console.log(
-      //   new Date(),
-      //   ":",
-      //   `New transaction https://translator.shyft.to/tx/${txn.transaction.signatures[0]} \n`,
-      //   // JSON.stringify(formattedSwapTxn.output, null, 2) + "\n",
-      //   formattedSwapTxn.transactionEvent
-      // );
-      // Save or update the latest event for this mint
-      pumpswapAggregator.update(formattedSwapTxn.transactionEvent);
-      // setTimeout(() => {
-      //   console.log("pumpswapAggregator", pumpswapAggregator.getAllStats());
-      // }, 30000);
-      arbitrageAggregator.updateFromPumpSwap(formattedSwapTxn.transactionEvent);
-    }
-  });
-
-  // Send subscribe request
-  await new Promise<void>((resolve, reject) => {
-    stream.write(args, (err: any) => {
-      if (err === null || err === undefined) {
+    // Create `error` / `end` handler
+    const streamClosed = new Promise<void>((resolve, reject) => {
+      stream.on("error", (error) => {
+        console.log("ERROR", error);
+        reject(error);
+        stream.end();
+      });
+      stream.on("end", () => {
         resolve();
-      } else {
-        reject(err);
+      });
+      stream.on("close", () => {
+        resolve();
+      });
+    });
+
+    // Handle updates
+    stream.on("data", (data) => {
+      if (data?.transaction) {
+        const txn = TXN_FORMATTER.formTransactionFromJson(
+          data.transaction,
+          Date.now()
+        );
+
+        const parsedTxn = decodePumpAmmTxn(txn);
+
+        if (!parsedTxn) return;
+        const formattedSwapTxn = parseSwapTransactionOutput(parsedTxn, txn);
+        if (!formattedSwapTxn) return;
+        pumpswapAggregator.update(formattedSwapTxn.transactionEvent);
+        arbitrageAggregator.updateFromPumpSwap(formattedSwapTxn.transactionEvent);
       }
     });
-  }).catch((reason) => {
-    console.log("reason ==>",reason);
-    throw reason;
-  });
 
-  await streamClosed;
+    // Send subscribe request
+    await new Promise<void>((resolve, reject) => {
+      stream.write(args, (err: any) => {
+        if (err === null || err === undefined) {
+          resolve();
+        } else {
+          reject(err);
+        }
+      });
+    }).catch((reason) => {
+      console.log("reason ==>", reason);
+      throw reason;
+    });
+
+    await streamClosed;
+  } catch (error) {
+    console.error("Error subscribing to Pump Swap events:", error);
+    return;
+  }
 }
 
 async function subscribeCommand(client: Client, args: SubscribeRequest) {
@@ -227,34 +222,34 @@ const req: SubscribeRequest = {
 };
 
 export const pumpSwapThread = () => {
-  
+
   subscribeCommand(client, req);
 }
 
 function decodePumpAmmTxn(tx: VersionedTransactionResponse) {
   if (tx.meta?.err) return;
-  try{
-  const paredIxs = PUMP_AMM_IX_PARSER.parseTransactionData(
-    tx.transaction.message,
-    tx.meta?.loadedAddresses,
-  );
+  try {
+    const paredIxs = PUMP_AMM_IX_PARSER.parseTransactionData(
+      tx.transaction.message,
+      tx.meta?.loadedAddresses,
+    );
 
-  const pumpAmmIxs = paredIxs.filter((ix) =>
-    ix.programId.equals(PUMP_AMM_PROGRAM_ID) || ix.programId.equals(new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")),
-  );
+    const pumpAmmIxs = paredIxs.filter((ix) =>
+      ix.programId.equals(PUMP_AMM_PROGRAM_ID) || ix.programId.equals(new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")),
+    );
 
-  const parsedInnerIxs = PUMP_AMM_IX_PARSER.parseTransactionWithInnerInstructions(tx);
+    const parsedInnerIxs = PUMP_AMM_IX_PARSER.parseTransactionWithInnerInstructions(tx);
 
-  const pump_amm_inner_ixs = parsedInnerIxs.filter((ix) =>
-    ix.programId.equals(PUMP_AMM_PROGRAM_ID) || ix.programId.equals(new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")),
-  );
+    const pump_amm_inner_ixs = parsedInnerIxs.filter((ix) =>
+      ix.programId.equals(PUMP_AMM_PROGRAM_ID) || ix.programId.equals(new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")),
+    );
 
 
-  if (pumpAmmIxs.length === 0) return;
-  const events = PUMP_AMM_EVENT_PARSER.parseEvent(tx);
-  const result = { instructions: {pumpAmmIxs,events}, inner_ixs:  pump_amm_inner_ixs };
-  bnLayoutFormatter(result);
-  return result;
-  }catch(err){
+    if (pumpAmmIxs.length === 0) return;
+    const events = PUMP_AMM_EVENT_PARSER.parseEvent(tx);
+    const result = { instructions: { pumpAmmIxs, events }, inner_ixs: pump_amm_inner_ixs };
+    bnLayoutFormatter(result);
+    return result;
+  } catch (err) {
   }
 }

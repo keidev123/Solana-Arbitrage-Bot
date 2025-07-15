@@ -1,4 +1,4 @@
-import { arbitrageAggregator } from "./dex/arbitrageAggregator";
+import { arbitrageAggregator } from "./arbitrageAggregator";
 // import "./dex/pumpSwap";
 // import "./dex/meteoraDammV2";
 

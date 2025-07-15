@@ -1,5 +1,5 @@
 // Global arbitrage aggregator for cross-DEX price comparison
-import { getDammV2Price } from '../../utils/utils';
+import { getDammV2Price } from '../utils/utils';
 
 export type ArbitrageOpportunity = {
   mint: string;
@@ -9,6 +9,9 @@ export type ArbitrageOpportunity = {
   pumpSwapEvent?: any;
   dammEvent?: any;
   dlmmEvent?: any;
+  pumpPoolId?: string;
+  dammV2PoolId?: string;
+  dlmmPoolId?: string;
   priceDifference?: number;
   arbitragePercentage?: number;
   lastUpdated: Date;
@@ -19,6 +22,14 @@ export class ArbitrageAggregator {
   private lastPrinted: Map<string, { pumpSwapPrice?: string; meteoraPrice?: string; dlmmPrice?: string; arbitragePercentage?: number }> = new Map();
   private debounceTimers: Map<string, NodeJS.Timeout> = new Map();
   private debounceDelayMs = 300;
+
+  // Helper to extract and format pool ID in short style
+  private getShortPoolId(poolId: string | undefined): string {
+    if (!poolId) return 'N/A';
+    // Take first 6 and last 4 characters, or just first 8 if shorter
+    if (poolId.length <= 8) return poolId;
+    return `${poolId.slice(0, 6)}...${poolId.slice(-4)}`;
+  }
 
   // Helper to check if profit or price changed
   private hasProfitOrPriceChanged(oldOpp: ArbitrageOpportunity | undefined, newPrice: string | undefined, priceKey: 'pumpSwapPrice' | 'meteoraPrice' | 'dlmmPrice', newArbPct: number | undefined): boolean {
@@ -71,6 +82,7 @@ export class ArbitrageAggregator {
     }
     opportunity.pumpSwapPrice = event.price;
     opportunity.pumpSwapEvent = event;
+    opportunity.pumpPoolId = event.poolId;
     opportunity.lastUpdated = new Date();
 
     // If this pair exists in both PumpSwap and DammV2, debounce the DammV2 price update and table print
@@ -121,6 +133,7 @@ export class ArbitrageAggregator {
     }
     opportunity.meteoraPrice = event.price;
     opportunity.dammEvent = event;
+    opportunity.dammV2PoolId = event.poolId;
     opportunity.lastUpdated = new Date();
     this.calculateArbitrage(opportunity);
     const realChange = this.hasProfitOrPriceChanged(
@@ -148,7 +161,9 @@ export class ArbitrageAggregator {
     }
     opportunity.dlmmPrice = event.price;
     opportunity.dlmmEvent = event;
+    opportunity.dlmmPoolId = event.poolId;
     opportunity.lastUpdated = new Date();
+    // console.log("🚀 ~ ArbitrageAggregator ~ updateFromDlmm ~ opportunity:", opportunity)
     this.calculateArbitrage(opportunity);
     const realChange = this.hasProfitOrPriceChanged(
       { ...opportunity, dlmmPrice: oldPrice, arbitragePercentage: oldArbPct },
@@ -201,15 +216,13 @@ export class ArbitrageAggregator {
     if (!shouldPrint) return;
     
     if (opportunities.length === 0) {
-      // console.log(`[ArbitrageAggregator] No arbitrage opportunities with ${minPercentage}% or higher difference`);
-      // console.log("size ==>", this.arbitrageStats.size)
       return;
     }
 
     // Table headers and column widths
     const headers = [
       'No',
-      'Mint',
+      'Mint (with Pool IDs)',
       'PumpSwap Price',
       'DammV2 Price',
       'DLMM Price',
@@ -217,13 +230,15 @@ export class ArbitrageAggregator {
       'Profit %',
       'Updated Time'
     ];
-    const colWidths = [6, 44, 18, 18, 18, 16, 10, 26];
+    const colWidths = [6, 70, 18, 18, 18, 16, 10, 26];
     // Box-drawing characters
     const h = '─', v = '│', tl = '┌', tr = '┐', bl = '└', br = '┘', l = '├', r = '┤', t = '┬', b = '┴', c = '┼';
     const pad = (str: string, len: number, align: 'left' | 'right' = 'left') => {
       if (str.length > len) return str.slice(0, len);
       return align === 'left' ? String(str).padEnd(len, ' ') : String(str).padStart(len, ' ');
     };
+    const underline = (len: number) => '―'.repeat(len); // Unicode underline
+
     // Top border
     let line = tl;
     for (let i = 0; i < headers.length; i++) {
@@ -246,16 +261,61 @@ export class ArbitrageAggregator {
     console.log(line);
     // Data rows
     opportunities.forEach((opp, idx) => {
-      let row = v;
-      row += pad((idx + 1).toString(), colWidths[0], 'right') + v;
-      row += pad(opp.mint, colWidths[1], 'left') + v;
-      row += pad(opp.pumpSwapPrice || 'N/A', colWidths[2], 'right') + v;
-      row += pad(opp.meteoraPrice || 'N/A', colWidths[3], 'right') + v;
-      row += pad(opp.dlmmPrice || 'N/A', colWidths[4], 'right') + v;
-      row += pad((opp.priceDifference?.toFixed(12) || 'N/A'), colWidths[5], 'right') + v;
-      row += pad((opp.arbitragePercentage?.toFixed(2) || 'N/A') + '%', colWidths[6], 'right') + v;
-      row += pad(opp.lastUpdated.toISOString(), colWidths[7], 'left') + v;
-      console.log(row);
+      // Prepare Mint column as multi-line: Mint, Pump Pool, Damm Pool, DLMM Pool
+      const mintLines = [
+        opp.mint,
+        `Pump Pool:  ${opp.pumpPoolId || 'N/A'}`,
+        `Damm Pool:  ${opp.dammV2PoolId || 'N/A'}`,
+        `DLMM Pool:  ${opp.dlmmPoolId || 'N/A'}`
+      ];
+      // Prepare other columns (all single-line)
+      const dataCols = [
+        (idx + 1).toString(),
+        mintLines, // special: array of lines
+        opp.pumpSwapPrice || 'N/A',
+        opp.meteoraPrice || 'N/A',
+        opp.dlmmPrice || 'N/A',
+        (opp.priceDifference?.toFixed(12) || 'N/A'),
+        (opp.arbitragePercentage?.toFixed(2) || 'N/A') + '%',
+        opp.lastUpdated.toISOString()
+      ];
+      // Underline for each cell
+      const underlineCols = dataCols.map((col, i) => {
+        if (Array.isArray(col)) {
+          // For Mint column, underline each line
+          return col.map(() => underline(colWidths[i]));
+        } else {
+          return underline(colWidths[i]);
+        }
+      });
+      // Find max lines for this row (Mint column is 4 lines, others are 1)
+      const maxLines = Math.max(...dataCols.map(col => Array.isArray(col) ? col.length : 1));
+      // Print each line of the row
+      for (let lineIdx = 0; lineIdx < maxLines + 1; lineIdx++) { // +1 for underline
+        let row = v;
+        for (let colIdx = 0; colIdx < dataCols.length; colIdx++) {
+          const col = dataCols[colIdx];
+          const under = underlineCols[colIdx];
+          if (lineIdx < maxLines) {
+            // Data line
+            if (Array.isArray(col)) {
+              row += pad(col[lineIdx] || '', colWidths[colIdx], 'left') + v;
+            } else if (lineIdx === 0) {
+              row += pad(col, colWidths[colIdx], colIdx === 0 ? 'right' : 'left') + v;
+            } else {
+              row += pad('', colWidths[colIdx], 'left') + v;
+            }
+          } else {
+            // Underline
+            if (Array.isArray(under)) {
+              row += under[lineIdx - 0] || underline(colWidths[colIdx]) + v;
+            } else {
+              row += under + v;
+            }
+          }
+        }
+        console.log(row);
+      }
     });
     // Bottom border
     line = bl;

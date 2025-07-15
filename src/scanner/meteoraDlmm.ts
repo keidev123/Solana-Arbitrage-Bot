@@ -1,5 +1,3 @@
-require('dotenv').config();
-
 import Client, {
   CommitmentLevel,
   SubscribeRequestAccountsDataSlice,
@@ -16,13 +14,13 @@ import { PublicKey, VersionedTransactionResponse } from "@solana/web3.js";
 import { Idl } from "@coral-xyz/anchor";
 import { SolanaParser } from "@shyft-to/solana-transaction-parser";
 import { TransactionFormatter } from "../../utils/transaction-formatter";
-import meteoraDLMMIdlRaw from "../idl/meteora_dlmm.json";
+import meteoraDLMMIdlRaw from "../../idl/meteora_dlmm.json";
 import { SolanaEventParser } from "../../utils/event-parser";
 import { bnLayoutFormatter } from "../../utils/bn-layout-formatter";
-import { transactionOutput } from "../../utils/transactionOutput";
-import { client } from "../../constants";
+import { transactionOutput } from "../../utils/dlmm_transaction_output";
+import { client, DLMM_PROGRAM_ADDRESS } from "../../constants";
 import { getDlmmPrice } from "../../utils";
-import { arbitrageAggregator } from "./arbitrageAggregator";
+import { arbitrageAggregator } from "../arbitrageAggregator";
 
 interface SubscribeRequest {
   accounts: { [key: string]: SubscribeRequestFilterAccounts };
@@ -39,7 +37,7 @@ interface SubscribeRequest {
 
 const TXN_FORMATTER = new TransactionFormatter();
 
-const METEORA_DLMM_PROGRAM_ID = new PublicKey("LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo");
+const METEORA_DLMM_PROGRAM_ID = new PublicKey(DLMM_PROGRAM_ADDRESS);
 const meteoraDLMMIdl = meteoraDLMMIdlRaw as unknown as Idl;
 
 const COMPUTE_BUDGET_PROGRAM_ID = new PublicKey(
@@ -85,10 +83,15 @@ const computeBudgetIdl: Idl = {
 };
 
 const METEORA_DLMM_IX_PARSER = new SolanaParser([]);
-METEORA_DLMM_IX_PARSER.addParserFromIdl(
-  METEORA_DLMM_PROGRAM_ID.toBase58(),
-  meteoraDLMMIdl as Idl
-);
+try {
+  
+  METEORA_DLMM_IX_PARSER.addParserFromIdl(
+    METEORA_DLMM_PROGRAM_ID.toBase58(),
+    meteoraDLMMIdl as Idl
+  );
+} catch (e) {
+
+}
 
 METEORA_DLMM_IX_PARSER.addParserFromIdl(
   COMPUTE_BUDGET_PROGRAM_ID.toBase58(),
@@ -102,71 +105,80 @@ METEORA_DLMM_EVENT_PARSER.addParserFromIdl(
 );
 
 async function handleStream(client: Client, args: SubscribeRequest) {
-  const stream = await client.subscribe();
-
-  const streamClosed = new Promise<void>((resolve, reject) => {
-    stream.on("error", (error) => {
-      console.error("Stream error:", error);
-      reject(error);
-      stream.end();
-    });
-    stream.on("end", resolve);
-    stream.on("close", resolve);
-  });
-
-  stream.on("data", async(data) => {
-    if (data?.transaction) {
-      const txn = TXN_FORMATTER.formTransactionFromJson(
-        data.transaction,
-        Date.now()
-      );
-
-
-      const parsedInstruction = decodeMeteoraDLMM(txn);
-      if (!parsedInstruction) return;
-
-      const tOutput: any = transactionOutput(parsedInstruction, txn);
-    //   console.dir(tOutput, { depth: null });
-      let instruction = tOutput?.transaction?.message?.instructions
-
-      let poolId = ""
-      let mint = ""
-      let price
-      if (instruction) {
-        for ( const ix of instruction ) {
-            let programId = ix.programId
-            if ( programId == "LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo" && (ix.accounts?.length == 17 || ix.accounts?.length == 18) ) {
-                poolId = ix.accounts[0].pubkey
-                mint = ix.accounts[6].pubkey
-                price = await getDlmmPrice(poolId.toString())
-                return
-            } 
-        }
-      }
-
-      arbitrageAggregator.updateFromDlmm({
-        mint: mint,
-        poolId: poolId,
-        price: price
+  try {
+    const stream = await client.subscribe();
+  
+    const streamClosed = new Promise<void>((resolve, reject) => {
+      stream.on("error", (error) => {
+        console.error("Stream error:", error);
+        reject(error);
+        stream.end();
       });
+      stream.on("end", resolve);
+      stream.on("close", resolve);
+    });
+  
+    stream.on("data", async(data) => {
+      if (data?.transaction) {
+        const txn = TXN_FORMATTER.formTransactionFromJson(
+          data.transaction,
+          Date.now()
+        );
+  
+  
+        const parsedInstruction = decodeMeteoraDLMM(txn);
+        if (!parsedInstruction) return;
+  
+        const tOutput: any = transactionOutput(parsedInstruction, txn);
+      //   console.dir(tOutput, { depth: null });
+        // console.log("🚀 ~ stream.on ~ tOutput:", tOutput)
+        let instruction = tOutput?.transaction?.message?.instructions
+  
+        let poolId = ""
+        let mint = ""
+        let price
+        let Sol = "So11111111111111111111111111111111111111112"
+        if (instruction) {
+          for ( const ix of instruction ) {
+              let programId = ix.programId
+              if ( programId == DLMM_PROGRAM_ADDRESS && (ix.accounts?.length == 17 || ix.accounts?.length == 18)) {
+                  poolId = ix.accounts[0].pubkey
+                  mint = ix.accounts[6].pubkey
+                  price = await getDlmmPrice(poolId.toString())
+              } 
+          }
+        }
+  
+        if ( mint != Sol ) {
 
-    }
-  });
-
-  await new Promise<void>((resolve, reject) => {
-    stream.write(args, (err: any) => {
-      if (!err) {
-        resolve();
-      } else {
-        reject(err);
+          arbitrageAggregator.updateFromDlmm({
+            mint: mint,
+            poolId: poolId,
+            price: price
+          });
+        }
+  
       }
     });
-  }).catch((reason) => {
-    console.error("Failed to write to stream:", reason);
-    throw reason;
-  });
+  
+    await new Promise<void>((resolve, reject) => {
+      stream.write(args, (err: any) => {
+        if (!err) {
+          resolve();
+        } else {
+          reject(err);
+        }
+      });
+    }).catch((reason) => {
+      console.error("Failed to write to stream:", reason);
+      throw reason;
+    });
+  
+    await streamClosed;
 
-  await streamClosed;
+  } catch (err) {
+    console.error("Error in handleStream:");
+  }
 }
 
 async function subscribeCommand(client: Client, args: SubscribeRequest) {
@@ -202,7 +214,10 @@ const req: SubscribeRequest = {
   commitment: CommitmentLevel.CONFIRMED,
 };
 
-subscribeCommand(client, req);
+export const dlmmThread = () => {
+
+  subscribeCommand(client, req);
+}
 
 function decodeMeteoraDLMM(tx: VersionedTransactionResponse) {
   if (tx.meta?.err) return;

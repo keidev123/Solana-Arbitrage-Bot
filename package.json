@@ -2,15 +2,7 @@
   "name": "volume-bot",
   "scripts": {
     "tsc": "tsc --noEmit",
-    "pump": "ts-node ./src/dex/pumpSwap.ts",
-    "dlmm": "ts-node ./src/dex/meteoraDlmm.ts",
-    "damm": "ts-node ./src/dex/meteoraDammV2.ts",
-    "gather": "ts-node ./src/gather.ts",
-    "arbitrage": "ts-node ./src/arbitrageBot.ts",
-    "start": "ts-node ./src/excuteBot.ts",
-    "unified-v1": "ts-node ./src/unifiedArbitrageBot.ts",
-    "price": "ts-node ./src/dex/index.ts",
-    "test": "ts-node ./src/dex/dlmm.ts"
+    "start": "ts-node ./src/excuteBot.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.30.1",
