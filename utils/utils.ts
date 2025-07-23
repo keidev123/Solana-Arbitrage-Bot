@@ -12,6 +12,42 @@ export const sleep = async (ms: number) => {
   await new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+export interface Data {
+  privateKey: string;
+  pubkey: string;
+}
+
+export const saveDataToFile = (newData: Data[], filePath: string = "data.json") => {
+  try {
+    let existingData: Data[] = [];
+
+    // Check if the file exists
+    if (fs.existsSync(filePath)) {
+      // If the file exists, read its content
+      const fileContent = fs.readFileSync(filePath, 'utf-8');
+      existingData = JSON.parse(fileContent);
+    }
+
+    // Add the new data to the existing array
+    existingData.push(...newData);
+
+    // Write the updated data back to the file
+    fs.writeFileSync(filePath, JSON.stringify(existingData, null, 2));
+
+  } catch (error) {
+    try {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        console.log(`File ${filePath} deleted and create new file.`);
+      }
+      fs.writeFileSync(filePath, JSON.stringify(newData, null, 2));
+      console.log("File is saved successfully.")
+    } catch (error) {
+      console.log('Error saving data to JSON file:', error);
+    }
+  }
+};
+
 export const getDlmmPrice = async (poolId: string) => {
   try {
     const USDC_USDT_POOL = new PublicKey(poolId)

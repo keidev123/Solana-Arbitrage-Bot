@@ -1,5 +1,15 @@
 // Global arbitrage aggregator for cross-DEX price comparison
+import { MIN_PROFIT_PERCNETAGE } from '../constants';
 import { getDammV2Price } from '../utils/utils';
+// Add imports for swap executors
+import { TradingPair, buyPumpswapToken, pumpSwapTrade, sellPumpswapTokenBySDK } from './trade/pumpSwap';
+import { dlmmTrade } from './trade/dlmm';
+import { dammTrade } from './trade/dammv2';
+import { TradeParams } from './trade/types';
+import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import { solanaConnection, wallet } from '../constants';
+import BN from 'bn.js';
+import DLMM from '@meteora-ag/dlmm';
 
 export type ArbitrageOpportunity = {
   mint: string;
@@ -22,6 +32,7 @@ export class ArbitrageAggregator {
   private lastPrinted: Map<string, { pumpSwapPrice?: string; meteoraPrice?: string; dlmmPrice?: string; arbitragePercentage?: number }> = new Map();
   private debounceTimers: Map<string, NodeJS.Timeout> = new Map();
   private debounceDelayMs = 300;
+  private executingMints: Set<string> = new Set(); // To prevent duplicate execution
 
   // Helper to extract and format pool ID in short style
   private getShortPoolId(poolId: string | undefined): string {
@@ -66,6 +77,49 @@ export class ArbitrageAggregator {
     }
   }
 
+  // Add method to execute swap
+  private async executeSwap(opportunity: ArbitrageOpportunity) {
+    if (this.executingMints.has(opportunity.mint)) return;
+    this.executingMints.add(opportunity.mint);
+    try {
+      const prices = [
+        { key: 'pumpSwapPrice', value: opportunity.pumpSwapPrice, poolId: opportunity.pumpPoolId },
+        { key: 'meteoraPrice', value: opportunity.meteoraPrice, poolId: opportunity.dammV2PoolId },
+        { key: 'dlmmPrice', value: opportunity.dlmmPrice, poolId: opportunity.dlmmPoolId },
+      ].filter(p => p.value !== undefined && p.poolId !== undefined);
+      if (prices.length < 2) return;
+      const sorted = prices.sort((a, b) => parseFloat(a.value!) - parseFloat(b.value!));
+      const buy = sorted[0];
+      const sell = sorted[sorted.length - 1];
+      const tradeAmount = 0.01;
+      const mint = new PublicKey(opportunity.mint);
+      const params: TradeParams = {
+        pool: new PublicKey(buy.poolId!),
+        inputMint: mint,
+        outputMint: mint,
+        amount: new BN(tradeAmount * 1e9),
+        slippage: 0.5,
+        user: wallet,
+        connection: solanaConnection
+      };
+      let result;
+      if (buy.key === 'pumpSwapPrice') {
+        result = await pumpSwapTrade(params);
+      } else if (buy.key === 'meteoraPrice') {
+        result = await dammTrade(params);
+      } else if (buy.key === 'dlmmPrice') {
+        result = await dlmmTrade(params);
+      }
+      if (result && !result.success) {
+        console.error('Swap execution error:', result.error);
+      }
+    } catch (err) {
+      console.error('Swap execution error:', err);
+    } finally {
+      setTimeout(() => this.executingMints.delete(opportunity.mint), 10000);
+    }
+  }
+
   // Update from pumpSwap
   updateFromPumpSwap(event: any) {
     if (!event || !event.mint) return;
@@ -101,7 +155,13 @@ export class ArbitrageAggregator {
           'pumpSwapPrice',
           opportunity.arbitragePercentage
         );
-        if (realChange) this.printArbitrageTable(1.0);
+        if (realChange) {
+          this.printArbitrageTable(Number(MIN_PROFIT_PERCNETAGE));
+          // Execute swap if profitable
+          if (opportunity.arbitragePercentage && opportunity.arbitragePercentage > Number(MIN_PROFIT_PERCNETAGE)) {
+            this.executeSwap(opportunity);
+          }
+        }
         this.debounceTimers.delete(mint);
       }, this.debounceDelayMs));
     } else {
@@ -113,7 +173,13 @@ export class ArbitrageAggregator {
         'pumpSwapPrice',
         opportunity.arbitragePercentage
       );
-      if (realChange) this.printArbitrageTable(1.0);
+      if (realChange) {
+        this.printArbitrageTable(Number(MIN_PROFIT_PERCNETAGE));
+        // Execute swap if profitable
+        if (opportunity.arbitragePercentage && opportunity.arbitragePercentage > Number(MIN_PROFIT_PERCNETAGE)) {
+          this.executeSwap(opportunity);
+        }
+      }
     }
   }
 
@@ -142,7 +208,12 @@ export class ArbitrageAggregator {
       'meteoraPrice',
       opportunity.arbitragePercentage
     );
-    if (realChange) this.printArbitrageTable(1.0);
+    if (realChange) {
+      this.printArbitrageTable(Number(MIN_PROFIT_PERCNETAGE));
+      if (opportunity.arbitragePercentage && opportunity.arbitragePercentage > Number(MIN_PROFIT_PERCNETAGE)) {
+        this.executeSwap(opportunity);
+      }
+    }
   }
 
   // Update from meteoraDlmm
@@ -171,7 +242,12 @@ export class ArbitrageAggregator {
       'dlmmPrice',
       opportunity.arbitragePercentage
     );
-    if (realChange) this.printArbitrageTable(1.0);
+    if (realChange) {
+      this.printArbitrageTable(Number(MIN_PROFIT_PERCNETAGE));
+      if (opportunity.arbitragePercentage && opportunity.arbitragePercentage > Number(MIN_PROFIT_PERCNETAGE)) {
+        this.executeSwap(opportunity);
+      }
+    }
   }
 
   private calculateArbitrage(opportunity: ArbitrageOpportunity) {

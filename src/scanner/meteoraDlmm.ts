@@ -18,7 +18,7 @@ import meteoraDLMMIdlRaw from "../../idl/meteora_dlmm.json";
 import { SolanaEventParser } from "../../utils/event-parser";
 import { bnLayoutFormatter } from "../../utils/bn-layout-formatter";
 import { transactionOutput } from "../../utils/dlmm_transaction_output";
-import { client, DLMM_PROGRAM_ADDRESS } from "../../constants";
+import { client, DLMM_PROGRAM_ADDRESS, EXCLUDED_TOKENS } from "../../constants";
 import { getDlmmPrice } from "../../utils";
 import { arbitrageAggregator } from "../arbitrageAggregator";
 
@@ -137,7 +137,7 @@ async function handleStream(client: Client, args: SubscribeRequest) {
         let poolId = ""
         let mint = ""
         let price
-        let Sol = "So11111111111111111111111111111111111111112"
+        let Sol = EXCLUDED_TOKENS
         if (instruction) {
           for ( const ix of instruction ) {
               let programId = ix.programId
