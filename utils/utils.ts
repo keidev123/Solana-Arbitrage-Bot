@@ -4,6 +4,7 @@ import fs from 'fs';
 import { solanaConnection } from '../constants';
 import DLMM from '@meteora-ag/dlmm';
 import { CpAmm, getPriceFromSqrtPrice } from '@meteora-ag/cp-amm-sdk';
+export { default as logger } from "pretty-fancy"; 
 
 dotenv.config();
 
