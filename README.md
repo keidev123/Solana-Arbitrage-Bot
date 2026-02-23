@@ -35,7 +35,8 @@ The system is designed for low-latency discovery and execution while remaining c
 
 ## Architecture
 
-<img width="2512" height="400" alt="image" src="https://github.com/user-attachments/assets/5f7de50f-3ece-4e65-95d6-385658ffd94d" />
+<img width="1096" height="278" alt="image" src="https://github.com/user-attachments/assets/7b233b0b-ebc0-4e42-b42b-41e6ef9035ce" />
+
 
 
 - gRPC Server: Accepts commands, streams metrics, and publishes market snapshots.
