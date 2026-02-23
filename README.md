@@ -74,15 +74,6 @@ Environment variables (example):
 ```bash
 RPC_ENDPOINT=https://mainnet.helius-rpc.com/?api-key=
 RPC_WEBSOCKET_ENDPOINT=wss://mainnet.helius-rpc.com/?api-key=
-LIL_JIT_ENDPOINT=https://aged-damp-sea.solana-mainnet.quiknode.pro/
-LIL_JIT_WEBSOCKET_ENDPOINT=wss://aged-damp-sea.solana-mainnet.quiknode.pro/
-JITO_KEY=
-BLOCK_ENGINE_URL=ny.mainnet.block-engine.jito.wtf
-
-TX_INTERVAL=10  # seconds
-
-JITO_MODE=true
-FEE_LEVEL=5      # 10 is standard
 SLIPPAGE=10       # percent
 PROFIT_LEVEL=10   # percent
 COMMITMENT=processed
