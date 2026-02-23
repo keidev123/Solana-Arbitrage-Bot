@@ -35,13 +35,8 @@ The system is designed for low-latency discovery and execution while remaining c
 
 ## Architecture
 
-```
-[ Market Data ]  =>  [ gRPC Server ]  =>  [ Strategy Engine ]  =>  [ Router ]  =>  [ TX Builder ]  =>  Solana RPC
-     |                       |                    |                     |                 
-     |                       |                    |                     +--> Venue adapters: Pump.fun / Meteora DLMM / dAMM v2
-     |                       |                    |
-     +--> External price feeds (optional)         +--> Risk module (limits, PnL, exposure)
-```
+<img width="2512" height="400" alt="image" src="https://github.com/user-attachments/assets/5f7de50f-3ece-4e65-95d6-385658ffd94d" />
+
 
 - gRPC Server: Accepts commands, streams metrics, and publishes market snapshots.
 - Strategy Engine: Detects spreads, sizes trades, and enforces risk.
