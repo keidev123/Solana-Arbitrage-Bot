@@ -167,7 +167,3 @@ https://github.com/user-attachments/assets/26a94223-b77f-463c-b480-678c24681d71
 - Enhanced strategy tuning via gRPC
 
 ---
-
-## Contact
-
-- **Telegram:** [https://t.me/Kei4650](https://t.me/Kei4650)  
